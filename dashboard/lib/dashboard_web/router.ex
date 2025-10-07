@@ -18,7 +18,8 @@ defmodule DashboardWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    get "/jobs", JobsController, :index
+
+    live "/jobs", JobsStreamLive
   end
 
   # Other scopes may use custom stacks.

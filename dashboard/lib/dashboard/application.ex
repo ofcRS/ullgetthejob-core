@@ -15,7 +15,8 @@ defmodule Dashboard.Application do
       # Start a worker by calling: Dashboard.Worker.start_link(arg)
       # {Dashboard.Worker, arg},
       # Start to serve requests, typically the last entry
-      DashboardWeb.Endpoint
+      DashboardWeb.Endpoint,
+      Dashboard.Jobs.Fetcher
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

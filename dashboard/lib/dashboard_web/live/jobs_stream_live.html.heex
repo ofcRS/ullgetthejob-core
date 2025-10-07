@@ -1,0 +1,130 @@
+
+    <div class="max-w-7xl mx-auto p-6 bg-gray-100">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+          🚀 Real-time Job Stream
+        </h1>
+        <p class="text-gray-600">
+          Demonstrating Elixir's concurrent fetching power
+        </p>
+      </div>
+
+    <!-- Stats Dashboard -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="text-sm font-medium text-gray-500">Current RPS</div>
+          <div class="mt-1 text-3xl font-semibold text-green-600">
+            {@stats.current_rps}
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="text-sm font-medium text-gray-500">Total Fetched</div>
+          <div class="mt-1 text-3xl font-semibold text-blue-600">
+            {@stats.total_fetched}
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="text-sm font-medium text-gray-500">Fetch Count</div>
+          <div class="mt-1 text-3xl font-semibold text-purple-600">
+            {@stats.fetch_count}
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="text-sm font-medium text-gray-500">Uptime</div>
+          <div class="mt-1 text-3xl font-semibold text-gray-700">
+            {format_elapsed(@elapsed_seconds)}
+          </div>
+        </div>
+      </div>
+
+    <!-- Controls -->
+      <div class="flex gap-4 mb-6">
+        <button
+          phx-click="fetch_now"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Fetch Now!
+        </button>
+
+        <button
+          phx-click="clear_jobs"
+          class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+        >
+          Clear Jobs
+        </button>
+
+        <button
+          phx-click="toggle_scroll"
+          class={[
+            "px-4 py-2 rounded-lg transition",
+            @auto_scroll && "bg-green-600 text-white hover:bg-green-700",
+            !@auto_scroll && "bg-gray-300 text-gray-700 hover:bg-gray-400"
+          ]}
+        >
+          Auto-scroll: {if @auto_scroll, do: "ON", else: "OFF"}
+        </button>
+      </div>
+
+    <!-- Status indicator -->
+      <div class="mb-4">
+        <%= if @status == :fetching do %>
+          <div class="flex items-center text-blue-600">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+            Fetching jobs concurrently...
+          </div>
+        <% else %>
+          <div class="text-gray-500">
+            Waiting for next fetch...
+          </div>
+        <% end %>
+      </div>
+
+    <!-- Jobs Stream -->
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 bg-gray-50 border-b">
+          <h2 class="text-lg font-semibold text-gray-900">
+            Latest Jobs ({length(@jobs)})
+          </h2>
+        </div>
+
+        <div
+          id="jobs-container"
+          class="divide-y divide-gray-200 max-h-96 overflow-y-auto"
+          phx-hook="ScrollControl"
+        >
+          <%= for job <- @jobs do %>
+            <div class="p-4 hover:bg-gray-50 transition animate-slide-in">
+              <div class="flex justify-between items-start">
+                <div class="flex-1">
+                  <h3 class="text-lg font-medium text-blue-600 hover:underline">
+                    <a href={job.url} target="_blank">{job.title}</a>
+                  </h3>
+                  <p class="text-gray-600">{job.company}</p>
+                  <div class="flex gap-4 mt-1 text-sm text-gray-500">
+                    <span>📍 {job.area}</span>
+                    <span>💰 {job.salary}</span>
+                  </div>
+                </div>
+                <span class="text-xs text-gray-400">
+                  {format_time(job.created_at)}
+                </span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+    <!-- Performance Metrics -->
+      <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+        <h3 class="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h3>
+        <div class="text-xs text-gray-600 space-y-1">
+          <div>Last fetch duration: {@stats.last_duration}ms</div>
+          <div>Average RPS: {calculate_avg_rps(@stats)}</div>
+          <div>Jobs per fetch: {calculate_avg_jobs(@stats)}</div>
+        </div>
+      </div>
+    </div>
