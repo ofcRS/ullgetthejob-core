@@ -89,7 +89,7 @@ defmodule Dashboard.Jobs.Fetcher do
 
         # Save jobs to database
         if length(jobs) > 0 do
-          now = DateTime.utc_now()
+          now = DateTime.utc_now() |> DateTime.truncate(:second)
 
           db_jobs =
             Enum.map(jobs, fn job ->
