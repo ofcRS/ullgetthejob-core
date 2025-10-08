@@ -18,8 +18,11 @@ defmodule Dashboard.Application do
       DashboardWeb.Presence,
       # Rate limiter with token bucket algorithm
       {Dashboard.RateLimiter, [capacity: 20, refill_rate: 5, refill_interval: 1000]},
-      # HH.ru client with cookie authentication
-      {Dashboard.HH.Client, cookies_file: Application.get_env(:dashboard, :hh_cookies_file, "hh.ru_cookies.txt")},
+      # HH.ru client with OAuth token support and cookie fallback
+      {Dashboard.HH.Client,
+        access_token: Application.get_env(:dashboard, Dashboard.HH.Client)[:access_token],
+        cookies_file: Application.get_env(:dashboard, Dashboard.HH.Client)[:cookies_file]
+      },
       # Start to serve requests, typically the last entry
       DashboardWeb.Endpoint,
       Dashboard.Jobs.Fetcher

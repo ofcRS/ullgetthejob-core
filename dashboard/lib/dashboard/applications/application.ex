@@ -17,6 +17,8 @@ defmodule Dashboard.Applications.Application do
     field :submitted_at, :utc_datetime
     field :response_data, :map
     field :error_message, :string
+    field :hh_resume_id, :string
+    field :hh_negotiation_id, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -34,7 +36,9 @@ defmodule Dashboard.Applications.Application do
       :status,
       :submitted_at,
       :response_data,
-      :error_message
+      :error_message,
+      :hh_resume_id,
+      :hh_negotiation_id
     ])
     |> validate_required([:job_external_id])
     |> validate_inclusion(:status, @valid_statuses)

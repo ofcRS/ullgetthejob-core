@@ -10,7 +10,6 @@ defmodule Dashboard.HH.Client do
 
   alias Dashboard.HH.CookieParser
 
-  @base_url "https://hh.ru"
   @api_url "https://api.hh.ru"
 
   defmodule State do
@@ -18,6 +17,7 @@ defmodule Dashboard.HH.Client do
     defstruct [
       :cookies,
       :cookies_file,
+      :access_token,
       :last_loaded,
       session_valid: true
     ]
@@ -44,6 +44,13 @@ defmodule Dashboard.HH.Client do
   end
 
   @doc """
+  Makes an authenticated PUT request to HH.ru
+  """
+  def put(path, body, opts \\ []) do
+    GenServer.call(__MODULE__, {:put, path, body, opts}, 30_000)
+  end
+
+  @doc """
   Gets current session status
   """
   def session_status do
@@ -61,30 +68,46 @@ defmodule Dashboard.HH.Client do
 
   @impl true
   def init(opts) do
-    cookies_file = Keyword.get(opts, :cookies_file, "hh.ru_cookies.txt")
+    access_token = Keyword.get(opts, :access_token) ||
+                   Application.get_env(:dashboard, __MODULE__)[:access_token]
 
-    case load_cookies(cookies_file) do
-      {:ok, cookies} ->
-        Logger.info("HH Client initialized with #{map_size(cookies)} cookies")
+    state = if access_token do
+      Logger.info("HH Client initialized with OAuth token")
+      %State{
+        access_token: access_token,
+        session_valid: true
+      }
+    else
+      # Fallback to cookies
+      cookies_file = Keyword.get(opts, :cookies_file, "hh.ru_cookies.txt")
 
-        state = %State{
-          cookies: cookies,
-          cookies_file: cookies_file,
-          last_loaded: DateTime.utc_now()
-        }
+      case load_cookies(cookies_file) do
+        {:ok, cookies} ->
+          Logger.info("HH Client initialized with #{map_size(cookies)} cookies")
 
-        {:ok, state}
+          %State{
+            cookies: cookies,
+            cookies_file: cookies_file,
+            last_loaded: DateTime.utc_now()
+          }
 
-      {:error, reason} ->
-        Logger.error("Failed to load cookies: #{inspect(reason)}")
-        {:stop, {:error, :cookie_load_failed}}
+        {:error, reason} ->
+          Logger.error("Failed to load cookies: #{inspect(reason)}")
+          Logger.error("No auth available (no token or cookies)")
+          {:stop, {:error, :no_auth}}
+      end
+    end
+
+    case state do
+      %State{} -> {:ok, state}
+      error -> error
     end
   end
 
   @impl true
   def handle_call({:get, path, opts}, _from, state) do
     url = build_url(path, opts)
-    headers = build_headers(state.cookies, opts)
+    headers = build_headers(state, opts)
 
     Logger.debug("GET #{url}")
 
@@ -118,11 +141,11 @@ defmodule Dashboard.HH.Client do
   @impl true
   def handle_call({:post, path, body, opts}, _from, state) do
     url = build_url(path, opts)
-    headers = build_headers(state.cookies, opts)
+    headers = build_headers(state, opts)
 
     Logger.debug("POST #{url}")
 
-    case Req.post(url, headers: headers, body: body) do
+    case Req.post(url, headers: headers, json: body) do
       {:ok, %{status: status, body: response_body}} when status in 200..299 ->
         {:reply, {:ok, response_body}, state}
 
@@ -131,8 +154,34 @@ defmodule Dashboard.HH.Client do
         new_state = %{state | session_valid: false}
         {:reply, {:error, :session_expired}, new_state}
 
-      {:ok, %{status: status}} ->
-        {:reply, {:error, {:unexpected_status, status}}, state}
+      {:ok, %{status: status, body: response_body}} ->
+        Logger.warning("POST failed with status #{status}: #{inspect(response_body)}")
+        {:reply, {:error, {:unexpected_status, status, response_body}}, state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:put, path, body, opts}, _from, state) do
+    url = build_url(path, opts)
+    headers = build_headers(state, opts)
+
+    Logger.debug("PUT #{url}")
+
+    case Req.put(url, headers: headers, json: body) do
+      {:ok, %{status: status, body: response_body}} when status in 200..299 ->
+        {:reply, {:ok, response_body}, state}
+
+      {:ok, %{status: 401}} ->
+        Logger.warning("Session expired (401)")
+        new_state = %{state | session_valid: false}
+        {:reply, {:error, :session_expired}, new_state}
+
+      {:ok, %{status: status, body: response_body}} ->
+        Logger.warning("PUT failed with status #{status}: #{inspect(response_body)}")
+        {:reply, {:error, {:unexpected_status, status, response_body}}, state}
 
       {:error, reason} ->
         {:reply, {:error, reason}, state}
@@ -203,7 +252,21 @@ defmodule Dashboard.HH.Client do
     base <> path_with_slash
   end
 
-  defp build_headers(cookies, opts) do
+  # Build headers with OAuth token (preferred)
+  defp build_headers(%State{access_token: token} = _state, opts) when not is_nil(token) do
+    base_headers = [
+      {"Authorization", "Bearer #{token}"},
+      {"User-Agent", "Dashboard/1.0 (job-application-assistant)"},
+      {"Accept", "application/json"},
+      {"Content-Type", "application/json"}
+    ]
+
+    custom_headers = Keyword.get(opts, :headers, [])
+    base_headers ++ custom_headers
+  end
+
+  # Build headers with cookies (fallback)
+  defp build_headers(%State{cookies: cookies} = _state, opts) when not is_nil(cookies) do
     cookie_header = cookies_to_header(cookies)
 
     base_headers = [

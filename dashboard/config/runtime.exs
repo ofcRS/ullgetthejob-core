@@ -8,8 +8,9 @@ import Config
 # The block below contains prod specific runtime configuration.
 
 # HH.ru Client Configuration
-config :dashboard,
-  hh_cookies_file: System.get_env("HH_COOKIES_FILE") || "hh.ru_cookies.txt"
+config :dashboard, Dashboard.HH.Client,
+  access_token: System.get_env("HH_ACCESS_TOKEN"),
+  cookies_file: System.get_env("HH_COOKIES_FILE") || "hh.ru_cookies.txt"
 
 # OpenRouter AI Configuration
 config :dashboard, Dashboard.AI.OpenRouterClient,
