@@ -7,6 +7,20 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+# HH.ru Client Configuration
+config :dashboard,
+  hh_cookies_file: System.get_env("HH_COOKIES_FILE") || "hh.ru_cookies.txt"
+
+# OpenRouter AI Configuration
+config :dashboard, Dashboard.AI.OpenRouterClient,
+  api_key: System.get_env("OPENROUTER_API_KEY"),
+  model: System.get_env("OPENROUTER_MODEL") || "openai/gpt-4-turbo",
+  base_url: "https://openrouter.ai/api/v1"
+
+# Application limits
+config :dashboard, Dashboard.Applications,
+  max_daily_applications: String.to_integer(System.get_env("MAX_DAILY_APPLICATIONS") || "10")
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

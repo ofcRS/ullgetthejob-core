@@ -19,7 +19,19 @@ defmodule DashboardWeb.Router do
 
     get "/", PageController, :home
 
+    # Jobs
     live "/jobs", JobsStreamLive
+
+    # CVs
+    live "/cvs", CVListLive
+    live "/cvs/upload", CVUploadLive
+    live "/cvs/:id", CVShowLive
+    live "/cvs/:id/edit", CVEditorLive
+
+    # Applications
+    live "/applications", ApplicationsLive
+    live "/applications/new", ApplicationPreviewLive
+    live "/applications/:id", ApplicationShowLive
   end
 
   # Other scopes may use custom stacks.

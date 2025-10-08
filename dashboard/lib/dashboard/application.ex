@@ -14,6 +14,12 @@ defmodule Dashboard.Application do
       {Phoenix.PubSub, name: Dashboard.PubSub},
       # Start a worker by calling: Dashboard.Worker.start_link(arg)
       # {Dashboard.Worker, arg},
+      # Presence tracking for viewer count
+      DashboardWeb.Presence,
+      # Rate limiter with token bucket algorithm
+      {Dashboard.RateLimiter, [capacity: 20, refill_rate: 5, refill_interval: 1000]},
+      # HH.ru client with cookie authentication
+      {Dashboard.HH.Client, cookies_file: Application.get_env(:dashboard, :hh_cookies_file, "hh.ru_cookies.txt")},
       # Start to serve requests, typically the last entry
       DashboardWeb.Endpoint,
       Dashboard.Jobs.Fetcher
