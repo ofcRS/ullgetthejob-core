@@ -1,4 +1,4 @@
-# UllGetTheJobs 🚀
+# YOU WILL GET THE JOB 🚀
 
 An intelligent job application automation platform built with Phoenix LiveView, designed to streamline your job search on HH.ru with AI-powered CV customization and automated tracking.
 
