@@ -148,7 +148,7 @@ defmodule DashboardWeb.CVEditorLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
-      <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="max-w-screen-2xl mx-auto px-4 py-8">
         <div class="mb-6">
           <.link navigate={~p"/cvs/#{@cv.id}"} class="text-blue-600 hover:text-blue-700">
             ← Back to CV

@@ -51,7 +51,7 @@ defmodule DashboardWeb.ApplicationsLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
-      <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="max-w-screen-2xl mx-auto px-4 py-8">
         <div class="flex justify-between items-center mb-8">
           <div>
             <h1 class="text-3xl font-bold text-gray-900">My Applications</h1>
