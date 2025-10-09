@@ -95,9 +95,9 @@ defmodule Dashboard.HH.Client do
             }
 
           {:error, reason} ->
-            Logger.error("Failed to load cookies: #{inspect(reason)}")
-            Logger.error("No auth available (no token or cookies)")
-            {:stop, {:error, :no_auth}}
+            Logger.warning("Failed to load cookies: #{inspect(reason)}")
+            Logger.warning("No auth available (no token or cookies) - HH Client will be disabled")
+            {:ok, %{session_valid: false}}
         end
       end
 
@@ -109,12 +109,15 @@ defmodule Dashboard.HH.Client do
 
   @impl true
   def handle_call({:get, path, opts}, _from, state) do
-    url = build_url(path, opts)
-    headers = build_headers(state, opts)
+    if not state.session_valid do
+      {:reply, {:error, :no_auth}, state}
+    else
+      url = build_url(path, opts)
+      headers = build_headers(state, opts)
 
-    Logger.debug("GET #{url}")
+      Logger.debug("GET #{url}")
 
-    case Req.get(url, headers: headers) do
+      case Req.get(url, headers: headers) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         {:reply, {:ok, body}, state}
 
@@ -139,16 +142,20 @@ defmodule Dashboard.HH.Client do
         Logger.error("Request failed: #{inspect(reason)}")
         {:reply, {:error, reason}, state}
     end
+    end
   end
 
   @impl true
   def handle_call({:post, path, body, opts}, _from, state) do
-    url = build_url(path, opts)
-    headers = build_headers(state, opts)
+    if not state.session_valid do
+      {:reply, {:error, :no_auth}, state}
+    else
+      url = build_url(path, opts)
+      headers = build_headers(state, opts)
 
-    Logger.debug("POST #{url}")
+      Logger.debug("POST #{url}")
 
-    case Req.post(url, headers: headers, json: body) do
+      case Req.post(url, headers: headers, json: body) do
       {:ok, %{status: status, body: response_body}} when status in 200..299 ->
         {:reply, {:ok, response_body}, state}
 
@@ -164,16 +171,20 @@ defmodule Dashboard.HH.Client do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+    end
   end
 
   @impl true
   def handle_call({:put, path, body, opts}, _from, state) do
-    url = build_url(path, opts)
-    headers = build_headers(state, opts)
+    if not state.session_valid do
+      {:reply, {:error, :no_auth}, state}
+    else
+      url = build_url(path, opts)
+      headers = build_headers(state, opts)
 
-    Logger.debug("PUT #{url}")
+      Logger.debug("PUT #{url}")
 
-    case Req.put(url, headers: headers, json: body) do
+      case Req.put(url, headers: headers, json: body) do
       {:ok, %{status: status, body: response_body}} when status in 200..299 ->
         {:reply, {:ok, response_body}, state}
 
@@ -189,13 +200,14 @@ defmodule Dashboard.HH.Client do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+    end
   end
 
   @impl true
   def handle_call(:session_status, _from, state) do
     status = %{
       valid: state.session_valid,
-      cookies_count: map_size(state.cookies),
+      cookies_count: if(state.cookies, do: map_size(state.cookies), else: 0),
       last_loaded: state.last_loaded
     }
 
