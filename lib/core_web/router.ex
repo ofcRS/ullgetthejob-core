@@ -1,17 +1,21 @@
-defmodule OrchestratorWeb.Router do
-  use OrchestratorWeb, :router
+defmodule CoreWeb.Router do
+  use CoreWeb, :router
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
-  scope "/api", OrchestratorWeb do
+  # Internal API for other services
+  scope "/api/v1", CoreWeb do
     pipe_through :api
-    get "/v1/system/health", HealthController, :health
+
+    get "/system/health", SystemController, :health
+    post "/rate-limit/check", RateLimitController, :check
+    post "/jobs/broadcast-dummy", SystemController, :broadcast_dummy
   end
 
   # Enable LiveDashboard in development
-  if Application.compile_env(:orchestrator, :dev_routes) do
+  if Application.compile_env(:core, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
     # it behind authentication and allow only admins to access it.
     # If your application does not have an admins-only section yet,
@@ -22,7 +26,7 @@ defmodule OrchestratorWeb.Router do
     scope "/dev" do
       pipe_through [:fetch_session, :protect_from_forgery]
 
-      live_dashboard "/dashboard", metrics: OrchestratorWeb.Telemetry
+      live_dashboard "/dashboard", metrics: CoreWeb.Telemetry
     end
   end
 end

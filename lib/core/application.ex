@@ -8,19 +8,19 @@ defmodule Core.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      OrchestratorWeb.Telemetry,
-      Orchestrator.Repo,
-      {DNSCluster, query: Application.get_env(:orchestrator, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Orchestrator.PubSub},
-      # Start a worker by calling: Orchestrator.Worker.start_link(arg)
-      # {Orchestrator.Worker, arg},
+      CoreWeb.Telemetry,
+      Core.Repo,
+      {DNSCluster, query: Application.get_env(:core, :dns_cluster_query) || :ignore},
+      {Phoenix.PubSub, name: Core.PubSub},
+      # Start a worker by calling: Core.Worker.start_link(arg)
+      # {Core.Worker, arg},
       # Start to serve requests, typically the last entry
-      OrchestratorWeb.Endpoint
+      CoreWeb.Endpoint
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Orchestrator.Supervisor]
+    opts = [strategy: :one_for_one, name: Core.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
@@ -28,7 +28,7 @@ defmodule Core.Application do
   # whenever the application is updated.
   @impl true
   def config_change(changed, _new, removed) do
-    OrchestratorWeb.Endpoint.config_change(changed, removed)
+    CoreWeb.Endpoint.config_change(changed, removed)
     :ok
   end
 end

@@ -1,12 +1,12 @@
-defmodule OrchestratorWeb do
+defmodule CoreWeb do
   @moduledoc """
   The entrypoint for defining your web interface, such
   as controllers, components, channels, and so on.
 
   This can be used in your application as:
 
-      use OrchestratorWeb, :controller
-      use OrchestratorWeb, :html
+      use CoreWeb, :controller
+      use CoreWeb, :html
 
   The definitions below will be executed for every controller,
   component, etc, so keep them short and clean, focused
@@ -39,7 +39,7 @@ defmodule OrchestratorWeb do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
 
-      use Gettext, backend: OrchestratorWeb.Gettext
+      use Gettext, backend: CoreWeb.Gettext
 
       import Plug.Conn
 
@@ -50,9 +50,9 @@ defmodule OrchestratorWeb do
   def verified_routes do
     quote do
       use Phoenix.VerifiedRoutes,
-        endpoint: OrchestratorWeb.Endpoint,
-        router: OrchestratorWeb.Router,
-        statics: OrchestratorWeb.static_paths()
+        endpoint: CoreWeb.Endpoint,
+        router: CoreWeb.Router,
+        statics: CoreWeb.static_paths()
     end
   end
 

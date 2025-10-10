@@ -7,19 +7,19 @@
 # General application configuration
 import Config
 
-config :orchestrator,
-  ecto_repos: [Orchestrator.Repo],
+config :core,
+  ecto_repos: [Core.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
 # Configures the endpoint
-config :orchestrator, OrchestratorWeb.Endpoint,
+config :core, CoreWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: OrchestratorWeb.ErrorJSON],
+    formats: [json: CoreWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Orchestrator.PubSub,
+  pubsub_server: Core.PubSub,
   live_view: [signing_salt: "H5Po1lr2"]
 
 # Configures Elixir's Logger

@@ -1,4 +1,4 @@
-defmodule OrchestratorWeb.Telemetry do
+defmodule CoreWeb.Telemetry do
   use Supervisor
   import Telemetry.Metrics
 
@@ -53,23 +53,23 @@ defmodule OrchestratorWeb.Telemetry do
       ),
 
       # Database Metrics
-      summary("orchestrator.repo.query.total_time",
+      summary("core.repo.query.total_time",
         unit: {:native, :millisecond},
         description: "The sum of the other measurements"
       ),
-      summary("orchestrator.repo.query.decode_time",
+      summary("core.repo.query.decode_time",
         unit: {:native, :millisecond},
         description: "The time spent decoding the data received from the database"
       ),
-      summary("orchestrator.repo.query.query_time",
+      summary("core.repo.query.query_time",
         unit: {:native, :millisecond},
         description: "The time spent executing the query"
       ),
-      summary("orchestrator.repo.query.queue_time",
+      summary("core.repo.query.queue_time",
         unit: {:native, :millisecond},
         description: "The time spent waiting for a database connection"
       ),
-      summary("orchestrator.repo.query.idle_time",
+      summary("core.repo.query.idle_time",
         unit: {:native, :millisecond},
         description:
           "The time the connection spent waiting before being checked out for the query"
