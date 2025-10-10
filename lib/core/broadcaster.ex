@@ -6,28 +6,54 @@ defmodule Core.Broadcaster do
   require Logger
 
   @api_base_url System.get_env("API_BASE_URL", "http://localhost:3000")
-  @api_secret System.get_env("API_SECRET", "dev_api_secret")
+  @api_secret System.get_env("ORCHESTRATOR_SECRET", "shared_secret_key")
 
   def broadcast_jobs(jobs, stats \\ %{}) do
     url = "#{@api_base_url}/api/v1/jobs/broadcast"
 
+    enriched_jobs =
+      Enum.map(jobs, fn job ->
+        %{
+          id: Map.get(job, :hh_vacancy_id) || Map.get(job, "hh_vacancy_id") || Map.get(job, :id) || Map.get(job, "id"),
+          title: Map.get(job, :title) || Map.get(job, "title"),
+          company: Map.get(job, :company) || Map.get(job, "company"),
+          salary: Map.get(job, :salary) || Map.get(job, "salary"),
+          area: Map.get(job, :area) || Map.get(job, "area"),
+          url: Map.get(job, :url) || Map.get(job, "url"),
+          skills: Map.get(job, :skills) || Map.get(job, "skills") || [],
+          description: Map.get(job, :description) || Map.get(job, "description"),
+          has_test: Map.get(job, :has_test) || Map.get(job, "has_test") || false
+        }
+      end)
+
     body = %{
-      jobs: jobs,
+      jobs: enriched_jobs,
       stats: stats
     }
 
     headers = [
-      {"X-Core-Secret", @api_secret}
+      {"X-Core-Secret", @api_secret},
+      {"Content-Type", "application/json"}
     ]
 
     case Req.post(url, json: body, headers: headers) do
       {:ok, %{status: 200, body: response_body}} ->
-        case Jason.decode(response_body) do
-          {:ok, %{"ok" => true, "delivered" => count}} ->
+        resp_map =
+          case response_body do
+            %{} = map -> map
+            bin when is_binary(bin) -> case Jason.decode(bin) do
+              {:ok, map} -> map
+              _ -> %{}
+            end
+            _ -> %{}
+          end
+
+        case resp_map do
+          %{"ok" => true, "delivered" => count} ->
             Logger.info("Successfully broadcast #{count} jobs")
             {:ok, count}
           _ ->
-            Logger.error("Unexpected response from API: #{response_body}")
+            Logger.error("Unexpected response from API: #{inspect(response_body)}")
             {:error, :unexpected_response}
         end
 
