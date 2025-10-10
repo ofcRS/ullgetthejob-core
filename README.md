@@ -1,18 +1,117 @@
-# YOU wILL GET THE JOB
+# 🎯 UllGetTheJob Core
 
-To start your Phoenix server:
+> **Phoenix-powered job application platform backend** 🔥  
+> Built with Elixir + Phoenix LiveView for real-time, reactive job hunting experiences!
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+---
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+## ✨ What's This?
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+**UllGetTheJob Core** is the heart of the job application tracking platform. This Phoenix application serves as the main backend, handling:
 
-## Learn more
+- 🚀 **Real-time updates** with Phoenix LiveView
+- 📊 **Job application tracking** and management
+- 🔐 **Authentication & authorization** 
+- 💾 **PostgreSQL database** integration with Ecto
+- 🎨 **Server-rendered UI** with LiveView components
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+---
+
+## 🛠️ Tech Stack
+
+- **Phoenix 1.8** - Modern web framework
+- **Elixir ~> 1.15** - Functional, concurrent language
+- **Ecto + PostgreSQL** - Database layer
+- **Phoenix LiveView** - Real-time server-rendered UI
+- **Bandit** - HTTP server
+- **Req** - Modern HTTP client
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Elixir 1.15 or later
+- PostgreSQL database
+- Erlang/OTP
+
+### Installation
+
+```bash
+# Install dependencies
+mix setup
+
+# Start Phoenix server
+mix phx.server
+
+# Or start inside IEx
+iex -S mix phx.server
+```
+
+Now visit [`localhost:4000`](http://localhost:4000) 🎉
+
+---
+
+## 📚 Available Commands
+
+```bash
+# Setup database and dependencies
+mix setup
+
+# Reset database
+mix ecto.reset
+
+# Run tests
+mix test
+
+# Run precommit checks (linting, formatting, tests)
+mix precommit
+```
+
+---
+
+## 🏗️ Project Structure
+
+```
+lib/
+├── core/              # Core business logic
+│   └── ...
+├── core_web/          # Web interface (controllers, views, LiveViews)
+│   └── ...
+├── core.ex            # Application entry point
+└── core_web.ex        # Web module definitions
+```
+
+---
+
+## 🧪 Development
+
+This project follows Phoenix best practices:
+
+- Use `mix precommit` before committing changes
+- Prefer `Req` library for HTTP requests
+- Follow Phoenix LiveView patterns for real-time features
+- Keep business logic in `lib/core/`
+- Keep web logic in `lib/core_web/`
+
+---
+
+## 📖 Learn More
+
+- [Phoenix Framework](https://www.phoenixframework.org/)
+- [Phoenix Guides](https://hexdocs.pm/phoenix/overview.html)
+- [Phoenix Docs](https://hexdocs.pm/phoenix)
+- [Elixir Forum](https://elixirforum.com/c/phoenix-forum)
+
+---
+
+## 📄 License
+
+MIT License - Copyright (c) 2025 Aleksandr Sakhatskiy
+
+---
+
+<div align="center">
+  Made with 💜 and Elixir
+</div>
