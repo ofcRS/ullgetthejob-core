@@ -18,7 +18,7 @@ defmodule Core.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Orchestrator.Application, []},
+      mod: {Core.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -44,8 +44,9 @@ defmodule Core.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5"},
-      {:httpoison, "~> 2.0"}
+      {:dns_cluster, "~> 0.1.1"},
+      {:bandit, "~> 1.0"},
+      {:req, "~> 0.4"}
     ]
   end
 

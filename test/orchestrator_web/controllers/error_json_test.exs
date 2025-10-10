@@ -1,12 +1,12 @@
-defmodule OrchestratorWeb.ErrorJSONTest do
-  use OrchestratorWeb.ConnCase, async: true
+defmodule CoreWeb.ErrorJSONTest do
+  use CoreWeb.ConnCase, async: true
 
   test "renders 404" do
-    assert OrchestratorWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
+    assert CoreWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
   end
 
   test "renders 500" do
-    assert OrchestratorWeb.ErrorJSON.render("500.json", %{}) ==
+    assert CoreWeb.ErrorJSON.render("500.json", %{}) ==
              %{errors: %{detail: "Internal Server Error"}}
   end
 end

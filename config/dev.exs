@@ -2,7 +2,10 @@ import Config
 
 # Configure your database
 config :core, Core.Repo,
-  url: System.get_env("DATABASE_URL"),
+  username: "postgres",
+  password: "1",
+  hostname: "localhost",
+  database: "ullget",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
@@ -13,7 +16,7 @@ config :core, Core.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :orchestrator, OrchestratorWeb.Endpoint,
+config :core, CoreWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],
@@ -47,7 +50,7 @@ config :orchestrator, OrchestratorWeb.Endpoint,
 # different ports.
 
 # Enable dev routes for dashboard and mailbox
-config :orchestrator, dev_routes: true
+config :core, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

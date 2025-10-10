@@ -17,12 +17,11 @@ defmodule Core.Broadcaster do
     }
 
     headers = [
-      {"Content-Type", "application/json"},
-      {"X-Orchestrator-Secret", @api_secret}
+      {"X-Core-Secret", @api_secret}
     ]
 
-    case HTTPoison.post(url, Jason.encode!(body), headers) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: response_body}} ->
+    case Req.post(url, json: body, headers: headers) do
+      {:ok, %{status: 200, body: response_body}} ->
         case Jason.decode(response_body) do
           {:ok, %{"ok" => true, "delivered" => count}} ->
             Logger.info("Successfully broadcast #{count} jobs")
@@ -32,13 +31,13 @@ defmodule Core.Broadcaster do
             {:error, :unexpected_response}
         end
 
-      {:ok, %HTTPoison.Response{status_code: status, body: response_body}} ->
+      {:ok, %{status: status, body: response_body}} ->
         Logger.error("API returned status #{status}: #{response_body}")
         {:error, status}
 
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        Logger.error("Failed to broadcast jobs: #{inspect(reason)}")
-        {:error, reason}
+      {:error, exception} ->
+        Logger.error("Failed to broadcast jobs: #{inspect(exception)}")
+        {:error, exception}
     end
   end
 

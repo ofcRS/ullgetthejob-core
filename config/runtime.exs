@@ -12,12 +12,12 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/orchestrator start
+#     PHX_SERVER=true bin/core start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :orchestrator, OrchestratorWeb.Endpoint, server: true
+  config :core, CoreWeb.Endpoint, server: true
 end
 
 if config_env() == :prod do
@@ -30,7 +30,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :orchestrator, Orchestrator.Repo,
+  config :core, Core.Repo,
     # ssl: true,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
@@ -53,9 +53,9 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
-  config :orchestrator, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :core, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :orchestrator, OrchestratorWeb.Endpoint,
+  config :core, CoreWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -72,7 +72,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :orchestrator, OrchestratorWeb.Endpoint,
+  #     config :core, CoreWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -94,7 +94,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :orchestrator, OrchestratorWeb.Endpoint,
+  #     config :core, CoreWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
