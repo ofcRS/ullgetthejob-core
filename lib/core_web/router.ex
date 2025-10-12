@@ -14,6 +14,14 @@ defmodule CoreWeb.Router do
     post "/jobs/broadcast-dummy", SystemController, :broadcast_dummy
   end
 
+  # API for Node.js BFF
+  scope "/api", CoreWeb.Api do
+    pipe_through :api
+
+    post "/jobs/search", JobController, :search
+    post "/applications/submit", ApplicationController, :submit
+  end
+
   # Enable LiveDashboard in development
   if Application.compile_env(:core, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put

@@ -92,4 +92,26 @@ defmodule Core.HH.Client do
     |> Enum.join("\n")
     |> String.trim()
   end
+
+  @doc """
+  Ensure a resume exists for the user and return its id. Placeholder implementation.
+  """
+  @spec get_or_create_resume(binary(), map()) :: {:ok, binary()} | {:error, any()}
+  def get_or_create_resume(_user_id, _customized_cv) do
+    {:ok, Ecto.UUID.generate()}
+  end
+
+  @doc """
+  Publish resume on HH.ru. Placeholder no-op.
+  """
+  @spec publish_resume(binary()) :: :ok | {:error, any()}
+  def publish_resume(_resume_id), do: :ok
+
+  @doc """
+  Submit application to HH.ru. Placeholder implementation returning negotiation id.
+  """
+  @spec submit_application(binary(), binary(), binary() | nil) :: {:ok, binary()} | {:error, any()}
+  def submit_application(_job_external_id, _resume_id, _cover_letter) do
+    {:ok, Ecto.UUID.generate()}
+  end
 end

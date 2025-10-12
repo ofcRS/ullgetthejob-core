@@ -1,18 +1,18 @@
 # 🎯 UllGetTheJob Core
 
-> **Phoenix-powered job application platform backend** 🔥  
-> Built with Elixir + Phoenix LiveView for real-time, reactive job hunting experiences!
+> **Phoenix-powered orchestrator and HH.ru integration backend** 🔥  
+> Orchestrator that owns DB schema and exposes APIs for Node.js BFF
 
 ---
 
 ## ✨ What's This?
 
-**UllGetTheJob Core** is the heart of the job application tracking platform. This Phoenix application serves as the main backend, handling:
+**UllGetTheJob Core** is the orchestrator backend and single source of truth, handling:
 
 - 🚀 **Real-time updates** with Phoenix LiveView
 - 📊 **Job application tracking** and management
 - 🔐 **Authentication & authorization** 
-- 💾 **PostgreSQL database** integration with Ecto
+- 💾 **PostgreSQL database** integration with Ecto (migrations owner)
 - 🎨 **Server-rendered UI** with LiveView components
 
 ---
@@ -68,6 +68,26 @@ mix test
 # Run precommit checks (linting, formatting, tests)
 mix precommit
 ```
+
+## Database Management
+
+This app is the master for all database changes.
+
+```
+# Create new migration
+mix ecto.gen.migration migration_name
+
+# Run migrations
+mix ecto.migrate
+
+# Rollback
+mix ecto.rollback
+```
+
+## API Endpoints for Node.js BFF
+
+- POST /api/jobs/search — Search for jobs on HH.ru
+- POST /api/applications/submit — Submit application to HH.ru
 
 ---
 
