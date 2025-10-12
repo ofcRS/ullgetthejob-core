@@ -7,7 +7,7 @@ defmodule Core.Repo.Migrations.CreateBaseTables do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :email, :string, null: false
       add :password_hash, :string, null: false
-      
+
       timestamps(type: :utc_datetime)
     end
 
@@ -26,7 +26,7 @@ defmodule Core.Repo.Migrations.CreateBaseTables do
       add :source, :string, default: "hh.ru"
       add :search_query, :string
       add :fetched_at, :utc_datetime
-      
+
       timestamps(type: :utc_datetime)
     end
 
@@ -46,7 +46,7 @@ defmodule Core.Repo.Migrations.CreateBaseTables do
       add :response_data, :map
       add :error_message, :text
       add :hh_resume_id, :string
-      
+
       timestamps(type: :utc_datetime)
     end
 
@@ -56,4 +56,3 @@ defmodule Core.Repo.Migrations.CreateBaseTables do
     create index(:applications, [:submitted_at])
   end
 end
-

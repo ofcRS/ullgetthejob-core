@@ -72,12 +72,12 @@ defmodule Core.Jobs.Orchestrator do
   def init(_opts) do
     # Schedule periodic check for job fetching
     schedule_tick()
-    
+
     state = %State{
       schedules: %{},
       last_fetch: nil
     }
-    
+
     Logger.info("Jobs Orchestrator started")
     {:ok, state}
   end
@@ -91,10 +91,10 @@ defmodule Core.Jobs.Orchestrator do
       last_run: nil,
       interval: interval
     }
-    
+
     new_schedules = Map.put(state.schedules, user_id, schedule)
     new_state = %{state | schedules: new_schedules}
-    
+
     Logger.info("Scheduled job fetch for user #{user_id}")
     {:reply, :ok, new_state}
   end
@@ -104,15 +104,15 @@ defmodule Core.Jobs.Orchestrator do
     case Map.get(state.schedules, user_id) do
       nil ->
         {:reply, {:error, :no_schedule}, state}
-      
+
       schedule ->
         result = perform_fetch(schedule.search_params)
-        
+
         # Update last_run
         updated_schedule = %{schedule | last_run: System.system_time(:second)}
         new_schedules = Map.put(state.schedules, user_id, updated_schedule)
         new_state = %{state | schedules: new_schedules}
-        
+
         {:reply, result, new_state}
     end
   end
@@ -140,22 +140,22 @@ defmodule Core.Jobs.Orchestrator do
   def handle_info(:tick, state) do
     # Check all schedules and run if needed
     now = System.system_time(:second)
-    
+
     updated_schedules =
       Enum.reduce(state.schedules, state.schedules, fn {user_id, schedule}, acc ->
-        should_run = 
+        should_run =
           schedule.enabled and
-          (schedule.last_run == nil or 
+          (schedule.last_run == nil or
            now - schedule.last_run >= div(schedule.interval, 1000))
-        
+
         if should_run do
           Logger.info("Running scheduled fetch for user #{user_id}")
-          
+
           case perform_fetch(schedule.search_params) do
             {:ok, _count} ->
               updated = %{schedule | last_run: now}
               Map.put(acc, user_id, updated)
-            
+
             {:error, reason} ->
               Logger.error("Scheduled fetch failed for user #{user_id}: #{inspect(reason)}")
               acc
@@ -164,7 +164,7 @@ defmodule Core.Jobs.Orchestrator do
           acc
         end
       end)
-    
+
     schedule_tick()
     {:noreply, %{state | schedules: updated_schedules, last_fetch: now}}
   end
@@ -173,15 +173,15 @@ defmodule Core.Jobs.Orchestrator do
 
   defp perform_fetch(search_params) do
     Logger.info("Fetching jobs with params: #{inspect(search_params)}")
-    
+
     case Client.fetch_vacancies(search_params) do
       {:ok, jobs} ->
         job_count = length(jobs)
         Logger.info("Fetched #{job_count} jobs from HH.ru")
-        
+
         # Limit to prevent overwhelming the system
         jobs_to_broadcast = Enum.take(jobs, @max_jobs_per_fetch)
-        
+
         # Broadcast to API service
         stats = %{
           total: job_count,
@@ -189,17 +189,17 @@ defmodule Core.Jobs.Orchestrator do
           source: "hh.ru",
           timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
         }
-        
+
         case Broadcaster.broadcast_jobs(jobs_to_broadcast, stats) do
           {:ok, delivered} ->
             Logger.info("Successfully broadcast #{delivered} jobs")
             {:ok, job_count}
-          
+
           {:error, reason} ->
             Logger.error("Failed to broadcast jobs: #{inspect(reason)}")
             {:error, :broadcast_failed}
         end
-      
+
       {:error, reason} ->
         Logger.error("Failed to fetch jobs: #{inspect(reason)}")
         {:error, reason}
@@ -211,4 +211,3 @@ defmodule Core.Jobs.Orchestrator do
     Process.send_after(self(), :tick, 300_000)
   end
 end
-

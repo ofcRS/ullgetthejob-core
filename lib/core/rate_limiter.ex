@@ -1,9 +1,9 @@
 defmodule Core.RateLimiter do
   @moduledoc """
   Token bucket rate limiter for HH.ru API calls.
-  
+
   HH.ru limits: ~200 applications/day
-  Configuration: 
+  Configuration:
   - capacity: 20 tokens
   - refill_rate: 8 tokens per hour (192/day, leaving buffer)
   """
@@ -68,16 +68,16 @@ defmodule Core.RateLimiter do
   def handle_call({:check_limit, user_id, action_type}, _from, state) do
     key = {user_id, action_type}
     bucket = Map.get(state.buckets, key, new_bucket())
-    
+
     # Refill if needed
     bucket = maybe_refill(bucket)
-    
+
     case bucket.tokens do
       tokens when tokens > 0 ->
         new_bucket = %{bucket | tokens: tokens - 1}
         new_state = %{state | buckets: Map.put(state.buckets, key, new_bucket)}
         {:reply, {:ok, new_bucket.tokens}, new_state}
-      
+
       _ ->
         # Calculate when tokens will be available
         next_refill = calculate_next_refill(bucket)
@@ -91,14 +91,14 @@ defmodule Core.RateLimiter do
     key = {user_id, action_type}
     bucket = Map.get(state.buckets, key, new_bucket())
     bucket = maybe_refill(bucket)
-    
+
     status = %{
       tokens: bucket.tokens,
       capacity: bucket.capacity,
       refill_rate: bucket.refill_rate,
       last_refill: bucket.last_refill
     }
-    
+
     {:reply, status, state}
   end
 
@@ -113,19 +113,19 @@ defmodule Core.RateLimiter do
   @impl true
   def handle_info(:refill, state) do
     # Refill all buckets
-    new_buckets = 
+    new_buckets =
       state.buckets
       |> Enum.map(fn {key, bucket} -> {key, maybe_refill(bucket)} end)
       |> Enum.into(%{})
-    
+
     # Clean up old inactive buckets (no activity in 24 hours)
     cutoff = System.system_time(:second) - 86_400
-    cleaned_buckets = 
+    cleaned_buckets =
       Enum.filter(new_buckets, fn {_key, bucket} ->
         bucket.last_refill && bucket.last_refill > cutoff
       end)
       |> Enum.into(%{})
-    
+
     schedule_refill()
     {:noreply, %{state | buckets: cleaned_buckets}}
   end
@@ -145,15 +145,15 @@ defmodule Core.RateLimiter do
     now = System.system_time(:second)
     last_refill = bucket.last_refill || now
     time_since_refill = now - last_refill
-    
+
     # Refill based on time passed (one refill per hour)
     hours_passed = div(time_since_refill, 3600)
-    
+
     if hours_passed > 0 do
       tokens_to_add = min(hours_passed * @refill_rate, @capacity - bucket.tokens)
       new_tokens = min(bucket.tokens + tokens_to_add, @capacity)
-      
-      %{bucket | 
+
+      %{bucket |
         tokens: new_tokens,
         last_refill: now
       }
@@ -173,4 +173,3 @@ defmodule Core.RateLimiter do
     Process.send_after(self(), :refill, @refill_interval)
   end
 end
-
