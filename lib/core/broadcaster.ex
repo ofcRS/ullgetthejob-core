@@ -6,7 +6,7 @@ defmodule Core.Broadcaster do
   require Logger
 
   @api_base_url System.get_env("API_BASE_URL", "http://localhost:3000")
-  @api_secret System.get_env("ORCHESTRATOR_SECRET", "shared_secret_key")
+  @api_secret System.get_env("ORCHESTRATOR_SECRET", "shared_secret_between_core_and_api")
 
   def broadcast_jobs(jobs, stats \\ %{}) do
     url = "#{@api_base_url}/api/v1/jobs/broadcast"

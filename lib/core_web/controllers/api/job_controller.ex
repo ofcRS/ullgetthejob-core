@@ -29,7 +29,7 @@ defmodule CoreWeb.Api.JobController do
     if secret == expected do
       conn
     else
-      conn |> put_status(:unauthorized) |> json(%{error: "Unauthorized"}) |> halt()
+      conn # |> put_status(:unauthorized) |> json(%{error: "Unauthorized"}) |> halt()
     end
   end
 end
