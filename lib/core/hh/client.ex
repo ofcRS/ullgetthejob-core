@@ -49,6 +49,41 @@ defmodule Core.HH.Client do
     end
   end
 
+  @doc """
+  Fetch authenticated user's resumes using access token.
+  GET /resumes/mine
+  """
+  @spec fetch_user_resumes(binary()) :: {:ok, list(map())} | {:error, any()}
+  def fetch_user_resumes(access_token) when is_binary(access_token) do
+    headers = [{"Authorization", "Bearer #{access_token}"}]
+    case Req.get("#{@base_url}/resumes/mine", headers: headers) do
+      {:ok, %{status: 200, body: body}} ->
+        data = decode_body(body)
+        {:ok, Map.get(data, "items", [])}
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("HH API resumes error status=#{status} body=#{inspect(body)}")
+        {:error, {:http_error, status}}
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Fetch resume details by id.
+  GET /resumes/:id
+  """
+  @spec fetch_resume_details(binary(), binary()) :: {:ok, map()} | {:error, any()}
+  def fetch_resume_details(resume_id, access_token) when is_binary(resume_id) and is_binary(access_token) do
+    headers = [{"Authorization", "Bearer #{access_token}"}]
+    case Req.get("#{@base_url}/resumes/#{resume_id}", headers: headers) do
+      {:ok, %{status: 200, body: body}} -> {:ok, decode_body(body)}
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("HH API resume details error status=#{status} body=#{inspect(body)}")
+        {:error, {:http_error, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp decode_body(%{} = body), do: body
   defp decode_body(body) when is_binary(body) do
     case Jason.decode(body) do

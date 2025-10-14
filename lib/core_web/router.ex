@@ -22,6 +22,19 @@ defmodule CoreWeb.Router do
     post "/applications/submit", ApplicationController, :submit
   end
 
+  scope "/auth/hh", CoreWeb do
+    pipe_through :api
+    get "/redirect", AuthController, :redirect
+    get "/callback", AuthController, :callback
+    post "/refresh", AuthController, :refresh
+  end
+
+  scope "/api/hh", CoreWeb do
+    pipe_through :api
+    get "/resumes", HHController, :resumes
+    get "/resumes/:id", HHController, :resume_details
+  end
+
   # Enable LiveDashboard in development
   if Application.compile_env(:core, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put

@@ -14,6 +14,7 @@
 - 🔐 **Authentication & authorization** 
 - 💾 **PostgreSQL database** integration with Ecto (migrations owner)
 - 🎨 **Server-rendered UI** with LiveView components
+- 🧩 **HH.ru OAuth** and resume operations (via tokens)
 
 ---
 
@@ -30,12 +31,6 @@
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-- Elixir 1.15 or later
-- PostgreSQL database
-- Erlang/OTP
-
 ### Installation
 
 ```bash
@@ -46,7 +41,7 @@ mix setup
 mix phx.server
 
 # Or start inside IEx
-iex -S mix phx.server
+iEx -S mix phx.server
 ```
 
 Now visit [`localhost:4000`](http://localhost:4000) 🎉
@@ -84,51 +79,49 @@ mix ecto.migrate
 mix ecto.rollback
 ```
 
+---
+
 ## API Endpoints for Node.js BFF
 
-- POST /api/jobs/search — Search for jobs on HH.ru
-- POST /api/applications/submit — Submit application to HH.ru
+- POST `/api/jobs/search` — Search for jobs on HH.ru
+- POST `/api/applications/submit` — Submit application to HH.ru
+
+### OAuth (HH.ru)
+- GET `/auth/hh/redirect` → JSON `{ url, state }`
+- GET `/auth/hh/callback?code=...` → exchanges code for `{ access_token, refresh_token, expires_at }`
+- POST `/auth/hh/refresh` → body `{ refresh_token }` → new tokens
+
+Token storage table: `hh_tokens` (MVP: plain text; add encryption before production).
+
+Env vars:
+```
+HH_CLIENT_ID=
+HH_CLIENT_SECRET=
+HH_REDIRECT_URI=http://localhost:5173/auth/callback
+```
 
 ---
 
-## 🏗️ Project Structure
-
-```
-lib/
-├── core/              # Core business logic
-│   └── ...
-├── core_web/          # Web interface (controllers, views, LiveViews)
-│   └── ...
-├── core.ex            # Application entry point
-└── core_web.ex        # Web module definitions
-```
-
----
-
-## 🧪 Development
-
-This project follows Phoenix best practices:
+## 🧪 Development Guidelines
 
 - Use `mix precommit` before committing changes
-- Prefer `Req` library for HTTP requests
-- Follow Phoenix LiveView patterns for real-time features
-- Keep business logic in `lib/core/`
-- Keep web logic in `lib/core_web/`
+- Prefer `Req` for HTTP requests
+- Keep business logic in `lib/core/`, web in `lib/core_web/`
+- Avoid nesting modules in a file (Phoenix 1.8 guidelines)
 
 ---
 
 ## 📖 Learn More
 
-- [Phoenix Framework](https://www.phoenixframework.org/)
-- [Phoenix Guides](https://hexdocs.pm/phoenix/overview.html)
-- [Phoenix Docs](https://hexdocs.pm/phoenix)
-- [Elixir Forum](https://elixirforum.com/c/phoenix-forum)
+- Phoenix Framework
+- Phoenix Guides
+- Phoenix Docs
 
 ---
 
 ## 📄 License
 
-MIT License - Copyright (c) 2025 Aleksandr Sakhatskiy
+MIT License © 2025 Aleksandr Sakhatskiy
 
 ---
 
