@@ -3,6 +3,8 @@ defmodule Core.HH.OAuth do
   HH OAuth token storage and refresh helpers.
   """
 
+  import Ecto.Query  # Add this import
+
   alias Core.Repo
   alias Core.HH.Token
 
