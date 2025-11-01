@@ -75,8 +75,8 @@ defmodule CoreWeb.Api.JobController do
   defp sanitize_description(nil), do: ""
   defp sanitize_description(description) when is_binary(description) do
     description
-    |> Regex.replace(~r/<[^>]*>/, " ")
-    |> Regex.replace(~r/\s+/, " ")
+    |> then(&Regex.replace(~r/<[^>]*>/, &1, " "))
+    |> then(&Regex.replace(~r/\s+/, &1, " "))
     |> String.trim()
   end
   defp sanitize_description(other), do: to_string(other)

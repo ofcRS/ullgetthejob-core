@@ -42,7 +42,8 @@ RUN apk add --no-cache \
     libstdc++ \
     libgcc \
     wget \
-    curl
+    curl \
+    inotify-tools
 
 # Create app user
 RUN addgroup -g 1000 app && \
