@@ -20,12 +20,17 @@ defmodule CoreWeb.AuthController do
   end
 
   def callback(conn, params) do
+    session_id = Map.get(params, "session_id")
+
     with {:ok, code} <- fetch_code(params),
-         {:ok, tokens} <- exchange_code_for_tokens(code) do
-      # MVP: no real auth; store with nil user
-      _ = Core.HH.OAuth.upsert_token(nil, tokens)
-      json(conn, %{success: true, tokens: tokens})
+         {:ok, tokens} <- exchange_code_for_tokens(code),
+         {:ok, _record} <- Core.HH.OAuth.upsert_token(session_id, tokens) do
+      json(conn, %{success: true, tokens: tokens, session_id: session_id})
     else
+      {:error, changeset = %Ecto.Changeset{}} ->
+        Logger.error("Failed to store HH tokens: #{inspect(changeset)}")
+        conn |> put_status(500) |> json(%{success: false, error: "Failed to persist tokens"})
+
       {:error, reason} ->
         conn |> put_status(400) |> json(%{success: false, error: inspect(reason)})
     end

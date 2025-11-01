@@ -32,6 +32,7 @@ defmodule CoreWeb.Router do
 
   scope "/api/hh", CoreWeb do
     pipe_through :api
+    get "/status", HHController, :status
     get "/resumes", HHController, :resumes
     get "/resumes/:id", HHController, :resume_details
   end
