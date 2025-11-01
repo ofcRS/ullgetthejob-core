@@ -69,6 +69,34 @@ defmodule Core.HH.Client do
   end
 
   @doc """
+  Fetch full vacancy details by id.
+  GET /vacancies/:id
+  """
+  @spec fetch_vacancy_details(binary()) :: {:ok, map()} | {:error, any()}
+  def fetch_vacancy_details(vacancy_id) when is_binary(vacancy_id) do
+    token = System.get_env("HH_ACCESS_TOKEN")
+    headers =
+      case token do
+        nil -> []
+        "" -> []
+        token -> [{"Authorization", "Bearer #{token}"}]
+      end
+
+    case Req.get("#{@base_url}/vacancies/#{vacancy_id}", headers: headers) do
+      {:ok, %{status: 200, body: body}} ->
+        {:ok, decode_body(body)}
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("HH API vacancy details error status=#{status} body=#{inspect(body)}")
+        {:error, {:http_error, status}}
+
+      {:error, reason} ->
+        Logger.error("HH API request failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Fetch resume details by id.
   GET /resumes/:id
   """

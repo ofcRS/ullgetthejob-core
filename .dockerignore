@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+LICENSE
+
+# Build artifacts
+/_build
+/deps
+*.ez
+
+# Development files
+.elixir_ls
+.vscode
+.idea
+
+# Database files
+*.dump
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+/test
+/cover
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml

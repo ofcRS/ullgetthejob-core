@@ -19,6 +19,7 @@ defmodule CoreWeb.Router do
     pipe_through :api
 
     post "/jobs/search", JobController, :search
+    get "/jobs/:id", JobController, :show
     post "/applications/submit", ApplicationController, :submit
   end
 

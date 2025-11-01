@@ -11,6 +11,7 @@ defmodule Core.Jobs.Orchestrator do
 
   alias Core.HH.Client
   alias Core.Broadcaster
+  alias Core.Jobs.Enrichment
 
   @fetch_interval 1_800_000  # 30 minutes
   @max_jobs_per_fetch 100
@@ -182,15 +183,18 @@ defmodule Core.Jobs.Orchestrator do
         # Limit to prevent overwhelming the system
         jobs_to_broadcast = Enum.take(jobs, @max_jobs_per_fetch)
 
+        # Enrich with full details before broadcasting
+        enriched_jobs = Enrichment.enrich_jobs(jobs_to_broadcast)
+
         # Broadcast to API service
         stats = %{
           total: job_count,
-          broadcasted: length(jobs_to_broadcast),
+          broadcasted: length(enriched_jobs),
           source: "hh.ru",
           timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
         }
 
-        case Broadcaster.broadcast_jobs(jobs_to_broadcast, stats) do
+        case Broadcaster.broadcast_jobs(enriched_jobs, stats) do
           {:ok, delivered} ->
             Logger.info("Successfully broadcast #{delivered} jobs")
             {:ok, job_count}

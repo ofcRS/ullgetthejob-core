@@ -1,5 +1,6 @@
 defmodule CoreWeb.AuthController do
   use CoreWeb, :controller
+  require Logger
 
   @hh_auth_url "https://hh.ru/oauth/authorize"
   @hh_token_url "https://hh.ru/oauth/token"
@@ -8,11 +9,13 @@ defmodule CoreWeb.AuthController do
     client_id = System.fetch_env!("HH_CLIENT_ID")
     redirect_uri = System.fetch_env!("HH_REDIRECT_URI")
     state = Ecto.UUID.generate()
+    Logger.info("OAuth redirect - client_id=#{client_id} redirect_uri=#{redirect_uri}")
     url = URI.new!(@hh_auth_url)
     |> URI.append_query("response_type=code")
     |> URI.append_query("client_id=#{client_id}")
     |> URI.append_query("redirect_uri=#{URI.encode_www_form(redirect_uri)}")
     |> URI.to_string()
+    Logger.info("Generated OAuth URL: #{url}")
     json(conn, %{url: url, state: state})
   end
 
@@ -48,6 +51,7 @@ defmodule CoreWeb.AuthController do
     client_id = System.fetch_env!("HH_CLIENT_ID")
     client_secret = System.fetch_env!("HH_CLIENT_SECRET")
     redirect_uri = System.fetch_env!("HH_REDIRECT_URI")
+    Logger.info("OAuth token exchange - code_received? #{is_binary(code)} redirect_uri=#{redirect_uri}")
 
     form = [
       grant_type: "authorization_code",
