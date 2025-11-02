@@ -179,6 +179,7 @@ defmodule Core.HH.Client do
 
         with {:ok, payload} <- build_resume_payload(customized_cv) do
           Logger.debug("HH resume payload: " <> resume_payload_summary(payload))
+          Logger.debug("HH resume payload FULL: #{inspect(payload, pretty: true, limit: :infinity)}")
 
           title = Map.get(payload, :title)
 
@@ -199,6 +200,7 @@ defmodule Core.HH.Client do
                         {:ok, id} ->
                           Logger.info("HH created resume (lookup): id=#{id} title=#{inspect(title)}")
                           ensure_resume_ready(access_token, id)
+                          verify_resume_usable(access_token, id)
                           {:ok, id}
                         _ ->
                           Logger.error("HH created resume but missing id and lookup failed for title=#{inspect(title)}")
@@ -207,6 +209,7 @@ defmodule Core.HH.Client do
                     id ->
                       Logger.info("HH created resume: id=#{id} location=#{inspect(get_header(resp, "location"))}")
                       ensure_resume_ready(access_token, id)
+                      verify_resume_usable(access_token, id)
                       {:ok, id}
                   end
 
@@ -226,6 +229,7 @@ defmodule Core.HH.Client do
                                   {:ok, id} ->
                                     Logger.info("HH created resume (retry+lookup): id=#{id} title=#{inspect(unique_title)}")
                                     ensure_resume_ready(access_token, id)
+                                    verify_resume_usable(access_token, id)
                                     {:ok, id}
                                   _ ->
                                     Logger.error("HH created resume (retry) but missing id and lookup failed for title=#{inspect(unique_title)}")
@@ -234,6 +238,7 @@ defmodule Core.HH.Client do
                               id ->
                                 Logger.info("HH created resume (retry): id=#{id} location=#{inspect(get_header(resp, "location"))}")
                                 ensure_resume_ready(access_token, id)
+                                verify_resume_usable(access_token, id)
                                 {:ok, id}
                             end
 
@@ -248,6 +253,7 @@ defmodule Core.HH.Client do
                     end
                   else
                 Logger.error("HH API create resume error status=400 body=#{log_term(body)}")
+                Logger.error("HH API create resume error FULL: #{inspect(decode_body(body), pretty: true, limit: :infinity)}")
                     {:error, {:http_error, 400, body}}
                   end
 
@@ -271,19 +277,27 @@ defmodule Core.HH.Client do
   """
   @spec publish_resume(binary(), binary()) :: :ok | {:error, any()}
   def publish_resume(access_token, resume_id) when is_binary(access_token) and is_binary(resume_id) do
+    Logger.info("Attempting to publish resume: id=#{resume_id}")
+    
     case Req.post("#{@base_url}/resumes/#{resume_id}/publish", headers: hh_headers(access_token)) do
-      {:ok, %{status: status}} when status in [200, 204] -> :ok
+      {:ok, %{status: status}} when status in [200, 204] ->
+        Logger.info("Successfully published resume: id=#{resume_id} status=#{status}")
+        :ok
       {:ok, %{status: 404}} ->
         # Some accounts may not require explicit publish or endpoint may vary; proceed.
+        Logger.warning("Resume publish returned 404 (may not be required): id=#{resume_id}")
         :ok
       {:ok, %{status: 400, body: body}} ->
         # HH may return "Can't publish resume" when publication isn't applicable; proceed.
         map = decode_body(body)
         desc = Map.get(map, "description") |> to_string()
+        Logger.warning("Resume publish returned 400: id=#{resume_id} desc=#{desc}")
         if String.contains?(String.downcase(desc), "can't publish") do
+          Logger.info("Resume publish not applicable (proceeding): id=#{resume_id}")
           :ok
         else
           Logger.error("HH API publish resume error status=400 body=#{log_term(body)}")
+          Logger.error("HH API publish resume error FULL: #{inspect(map, pretty: true, limit: :infinity)}")
           {:error, {:http_error, 400, body}}
         end
       {:ok, %{status: status, body: body}} ->
@@ -309,12 +323,13 @@ defmodule Core.HH.Client do
 
       json_headers = auth_headers ++ [{"Content-Type", "application/json"}]
       json_payload = %{
-        vacancy_id: job_external_id,
-        resume_id: resume_id,
-        message: cover_letter || ""
+        "vacancy_id" => job_external_id,
+        "resume_id" => resume_id,
+        "message" => cover_letter || ""
       }
 
-      Logger.debug("Negotiation attempt(JSON): vacancy_id_present=#{job_external_id not in [nil, ""]} resume_id_len=#{String.length(resume_id)}")
+      Logger.debug("Negotiation attempt(JSON): vacancy_id=#{job_external_id} resume_id=#{resume_id}")
+      Logger.debug("JSON payload: #{inspect(json_payload)}")
 
       with {:json_attempt, {:ok, result}} <- {:json_attempt, do_negotiation_json(json_headers, json_payload)} do
         {:ok, result}
@@ -432,20 +447,28 @@ defmodule Core.HH.Client do
   defp build_resume_payload(customized_cv) do
     with {:ok, contacts} <- build_contact(customized_cv),
          skills_text <- build_skills(Map.get(customized_cv, "skills")),
-         experience <- build_experience_sections(Map.get(customized_cv, "experience"), customized_cv),
-         education <- build_education_sections(Map.get(customized_cv, "education")) do
+         experience <- build_experience_sections(Map.get(customized_cv, "experience"), customized_cv) do
+      # Education is ALWAYS included with level field (required by HH API)
+      education = build_education_sections(Map.get(customized_cv, "education"))
+      
       payload = %{
         title: Map.get(customized_cv, "title") || "Resume",
         first_name: Map.get(customized_cv, "firstName") || Map.get(customized_cv, "first_name") || "",
         last_name: Map.get(customized_cv, "lastName") || Map.get(customized_cv, "last_name") || "",
-        summary: Map.get(customized_cv, "summary") || Map.get(customized_cv, "about")
+        summary: Map.get(customized_cv, "summary") || Map.get(customized_cv, "about"),
+        education: education,
+        # Required field for publishing
+        professional_roles: build_professional_roles(customized_cv)
       }
       |> maybe_put(:area, build_area(customized_cv))
       |> maybe_put(:contact, contacts)
       |> maybe_put(:skills, skills_text)
       |> maybe_put(:experience, experience)
-      |> maybe_put(:education, education)
+      |> maybe_put(:salary, build_salary(customized_cv))
+      |> maybe_put(:employment, build_employment())
+      |> maybe_put(:schedule, build_schedule())
 
+      Logger.info("Resume payload includes professional_roles (and optionally employment/schedule) for publishing")
       {:ok, payload}
     end
   end
@@ -492,7 +515,8 @@ defmodule Core.HH.Client do
 
   defp build_experience_sections(nil, _cv), do: nil
   defp build_experience_sections(experience, customized_cv) when is_list(experience) do
-    Enum.map(experience, fn entry ->
+    experience
+    |> Enum.map(fn entry ->
       %{
         "company" => Map.get(entry, "company") || Map.get(entry, "employer") || Map.get(entry, "organization") || default_company(customized_cv),
         "position" => Map.get(entry, "position") || Map.get(entry, "role") || default_position(customized_cv),
@@ -551,6 +575,7 @@ defmodule Core.HH.Client do
       |> Enum.map(&normalize_education_entry/1)
       |> Enum.reject(&is_nil/1)
 
+    # Always return education with level, even if primary is empty
     %{
       "level" => %{"id" => "higher"},
       "primary" => primary
@@ -729,6 +754,45 @@ defmodule Core.HH.Client do
     end
   end
 
+  # NOTE: specialization field is DEPRECATED by HH.ru API (as of Nov 2025)
+  # Removed build_specialization function - do not use
+
+  # Required for resume publishing: Professional roles
+  defp build_professional_roles(customized_cv) do
+    title = Map.get(customized_cv, "title") || ""
+    
+    # Map to HH.ru professional role IDs
+    role_id = cond do
+      String.contains?(String.downcase(title), ["developer", "engineer", "programmer"]) -> "96"  # Developer/Programmer
+      String.contains?(String.downcase(title), ["analyst"]) -> "10"  # Analyst
+      String.contains?(String.downcase(title), ["data"]) -> "165"  # Data analyst
+      String.contains?(String.downcase(title), ["devops"]) -> "164"  # DevOps
+      String.contains?(String.downcase(title), ["qa", "test"]) -> "124"  # Tester
+      String.contains?(String.downcase(title), ["frontend"]) -> "96"  # Developer
+      String.contains?(String.downcase(title), ["backend"]) -> "96"  # Developer
+      String.contains?(String.downcase(title), ["manager"]) -> "40"  # Project manager
+      String.contains?(String.downcase(title), ["designer"]) -> "34"  # Designer
+      true -> "96"  # Default to Developer
+    end
+
+    [%{"id" => role_id}]
+  end
+
+  # Employment type preferences - currently disabled (causes API errors)
+  defp build_employment do
+    nil  # TODO: Re-enable once correct format is determined
+  end
+
+  # Schedule preferences - currently disabled (causes API errors)
+  defp build_schedule do
+    nil  # TODO: Re-enable once correct format is determined
+  end
+
+  # Salary expectations (optional)
+  defp build_salary(_customized_cv) do
+    nil  # Let user set this manually if needed
+  end
+
   defp find_existing_resume_by_title(access_token, title) when is_binary(title) do
     case fetch_user_resumes(access_token) do
       {:ok, items} ->
@@ -777,17 +841,42 @@ defmodule Core.HH.Client do
     end
   end
 
+  defp verify_resume_usable(access_token, resume_id) when is_binary(access_token) and is_binary(resume_id) do
+    Logger.info("Verifying resume is usable for negotiations: id=#{resume_id}")
+    
+    case fetch_resume_details(resume_id, access_token) do
+      {:ok, resume} ->
+        status = Map.get(resume, "status") || Map.get(resume, :status)
+        access = Map.get(resume, "access") || Map.get(resume, :access)
+        can_publish = Map.get(resume, "can_publish_or_update") || Map.get(resume, :can_publish_or_update)
+        
+        Logger.info("Resume status: id=#{resume_id} status=#{inspect(status)} access=#{inspect(access)} can_publish=#{inspect(can_publish)}")
+        
+        # Add extra delay to ensure HH.ru has processed the resume for negotiations
+        Logger.info("Adding 2-second delay for HH.ru to process resume for negotiations")
+        Process.sleep(2000)
+        :ok
+        
+      {:error, reason} ->
+        Logger.error("Could not verify resume: id=#{resume_id} reason=#{inspect(reason)}")
+        :ok
+    end
+  end
+
   defp ensure_existing_resume_completeness(access_token, resume_id, customized_cv)
        when is_binary(access_token) and is_binary(resume_id) and is_map(customized_cv) do
     case fetch_resume_details(resume_id, access_token) do
       {:ok, resume} ->
         missing_education = education_missing?(resume)
         missing_contacts = contacts_missing?(resume)
+        missing_professional_roles = professional_roles_missing?(resume)
 
         updates = %{}
         updates =
           if missing_education do
-            Map.put(updates, :education, build_education_sections(Map.get(customized_cv, "education")))
+            edu = build_education_sections(Map.get(customized_cv, "education"))
+            Logger.info("Adding missing education to resume #{resume_id}: #{inspect(edu)}")
+            Map.put(updates, :education, edu)
           else
             updates
           end
@@ -802,13 +891,29 @@ defmodule Core.HH.Client do
             updates
           end
 
+        updates =
+          if missing_professional_roles do
+            roles = build_professional_roles(customized_cv)
+            Logger.info("Adding missing professional_roles to resume #{resume_id}")
+            Map.put(updates, :professional_roles, roles)
+          else
+            updates
+          end
+
+        # Note: employment and schedule might not be required for updates
+        # Only add professional_roles if missing
+
         if map_size(updates) == 0 do
           :ok
         else
+          Logger.debug("Updating resume #{resume_id} with: #{inspect(updates, pretty: true)}")
           case Req.put("#{@base_url}/resumes/#{resume_id}", headers: hh_headers(access_token), json: updates) do
-            {:ok, %{status: status}} when status in [200, 204] -> :ok
+            {:ok, %{status: status}} when status in [200, 204] ->
+              Logger.info("Successfully updated resume #{resume_id} with required fields for publishing")
+              :ok
             {:ok, %{status: status, body: body}} ->
               Logger.error("HH update resume error status=#{status} body=#{log_term(body)}")
+              Logger.error("HH update resume error FULL: #{inspect(decode_body(body), pretty: true, limit: :infinity)}")
               {:error, {:http_error, status, body}}
             {:error, reason} ->
               Logger.error("HH update resume request failed: #{inspect(reason)}")
@@ -835,6 +940,11 @@ defmodule Core.HH.Client do
   defp contacts_missing?(resume) when is_map(resume) do
     contacts = Map.get(resume, "contact") || Map.get(resume, :contact)
     not (is_list(contacts) and length(contacts) > 0)
+  end
+
+  defp professional_roles_missing?(resume) when is_map(resume) do
+    roles = Map.get(resume, "professional_roles") || Map.get(resume, :professional_roles)
+    not (is_list(roles) and length(roles) > 0)
   end
 
   defp extract_resume_id_from_response(%{body: body} = resp) do
