@@ -109,11 +109,20 @@ defmodule Core.Jobs.Orchestrator do
       schedule ->
         result = perform_fetch(schedule.search_params)
 
-        # Update last_run
-        updated_schedule = %{schedule | last_run: System.system_time(:second)}
-        new_schedules = Map.put(state.schedules, user_id, updated_schedule)
-        new_state = %{state | schedules: new_schedules}
+        # Only update last_run if fetch AND broadcast both succeeded
+        new_schedules =
+          case result do
+            {:ok, _result_map} ->
+              # Success - update last_run
+              updated_schedule = %{schedule | last_run: System.system_time(:second)}
+              Map.put(state.schedules, user_id, updated_schedule)
 
+            {:error, _reason} ->
+              # Failure - don't update last_run so retry happens sooner
+              state.schedules
+          end
+
+        new_state = %{state | schedules: new_schedules}
         {:reply, result, new_state}
     end
   end
@@ -153,9 +162,25 @@ defmodule Core.Jobs.Orchestrator do
           Logger.info("Running scheduled fetch for user #{user_id}")
 
           case perform_fetch(schedule.search_params) do
-            {:ok, _count} ->
+            {:ok, result} ->
+              # Only update last_run if both fetch AND broadcast succeeded
+              fetched = Map.get(result, :fetched, 0)
+              broadcast = Map.get(result, :broadcast, 0)
+              Logger.info("Scheduled fetch completed for user #{user_id}: fetched=#{fetched} broadcast=#{broadcast}")
               updated = %{schedule | last_run: now}
               Map.put(acc, user_id, updated)
+
+            {:error, {:broadcast_failed, reason}} ->
+              # Broadcast failed but fetch succeeded - don't update last_run
+              # so we retry sooner
+              Logger.error("Scheduled fetch broadcast failed for user #{user_id}: #{inspect(reason)}")
+              Logger.warning("Will retry fetch for user #{user_id} on next tick (broadcast failure)")
+              acc
+
+            {:error, {:fetch_failed, reason}} ->
+              # Fetch failed - don't update last_run so we retry sooner
+              Logger.error("Scheduled fetch failed for user #{user_id}: #{inspect(reason)}")
+              acc
 
             {:error, reason} ->
               Logger.error("Scheduled fetch failed for user #{user_id}: #{inspect(reason)}")
@@ -197,16 +222,19 @@ defmodule Core.Jobs.Orchestrator do
         case Broadcaster.broadcast_jobs(enriched_jobs, stats) do
           {:ok, delivered} ->
             Logger.info("Successfully broadcast #{delivered} jobs")
-            {:ok, job_count}
+            # FIXED: Return success with both fetch and broadcast counts
+            {:ok, %{fetched: job_count, broadcast: delivered}}
 
           {:error, reason} ->
             Logger.error("Failed to broadcast jobs: #{inspect(reason)}")
-            {:error, :broadcast_failed}
+            # FIXED: Return error tuple so orchestrator knows broadcast failed
+            # This prevents marking the fetch as successful when users didn't receive jobs
+            {:error, {:broadcast_failed, reason}}
         end
 
       {:error, reason} ->
         Logger.error("Failed to fetch jobs: #{inspect(reason)}")
-        {:error, reason}
+        {:error, {:fetch_failed, reason}}
     end
   end
 
