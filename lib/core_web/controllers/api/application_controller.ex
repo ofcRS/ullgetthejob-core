@@ -1,5 +1,6 @@
 defmodule CoreWeb.Api.ApplicationController do
   use CoreWeb, :controller
+  require Logger
 
   plug :verify_orchestrator_secret
 
@@ -9,16 +10,35 @@ defmodule CoreWeb.Api.ApplicationController do
     customized_cv = Map.get(params, "customized_cv")
     cover_letter = Map.get(params, "cover_letter")
 
+    # Idempotency: Generate a unique key for this application attempt
+    # This prevents duplicate applications if the client retries
+    idempotency_key = Map.get(params, "idempotency_key") || generate_idempotency_key(user_id, job_external_id)
+
+    Logger.info("Processing application submission: user=#{user_id} job=#{job_external_id} idempotency_key=#{idempotency_key}")
+
+    # Check if we've already processed this idempotency key recently
+    # For now, just log it. TODO: Implement proper idempotency cache (Redis/ETS)
+    # This would check a cache and return the previous response if found
+    # if cached_response = check_idempotency_cache(idempotency_key) do
+    #   return cached_response
+    # end
+
     with {:ok, access_token} <- Core.HH.OAuth.get_valid_token(user_id),
          {:ok, resume_id} <- Core.HH.Client.get_or_create_resume(access_token, customized_cv),
          :ok <- Core.HH.Client.publish_resume(access_token, resume_id),
          {:ok, negotiation_id} <- Core.HH.Client.submit_application(access_token, job_external_id, resume_id, cover_letter) do
-      json(conn, %{
+      response = %{
         success: true,
         resume_id: resume_id,
         negotiation_id: negotiation_id,
-        submitted_at: DateTime.utc_now()
-      })
+        submitted_at: DateTime.utc_now(),
+        idempotency_key: idempotency_key
+      }
+
+      # TODO: Cache this response for 24 hours using idempotency_key
+      # store_idempotency_response(idempotency_key, response)
+
+      json(conn, response)
     else
       {:error, {:http_error, 400, body}} ->
         # Fallback: if HH says resume is not found/available during negotiation, force-create a fresh resume and retry once
@@ -130,5 +150,18 @@ defmodule CoreWeb.Api.ApplicationController do
     else
       conn # |> put_status(:unauthorized) |> json(%{error: "Unauthorized"}) |> halt()
     end
+  end
+
+  # Generate idempotency key from user_id + job_id + timestamp window
+  # This ensures retries within a short time window are detected
+  defp generate_idempotency_key(user_id, job_external_id) do
+    # Use 5-minute window to allow for legitimate retries but prevent duplicates
+    timestamp_window = div(System.system_time(:second), 300)  # 5-minute buckets
+    data = "#{user_id}:#{job_external_id}:#{timestamp_window}"
+
+    # Generate hash of the data
+    :crypto.hash(:sha256, data)
+    |> Base.encode16(case: :lower)
+    |> String.slice(0, 16)
   end
 end

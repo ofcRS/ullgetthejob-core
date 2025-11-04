@@ -9,6 +9,20 @@ defmodule Core.HH.Client do
 
   @base_url "https://api.hh.ru"
 
+  # Configuration constants for retry and delay logic
+  # These values are based on HH.ru API behavior observed in production:
+  # - Resume creation can take 1-2 seconds to become available
+  # - Negotiation endpoints may need additional time for resume indexing
+  # - HH.ru has eventual consistency, requiring polling strategies
+
+  @resume_ready_max_attempts 12
+  @resume_ready_delay_ms 500  # 500ms between resume availability checks (max 6s total)
+
+  @negotiation_retry_max_attempts 8
+  @negotiation_retry_delay_ms 1500  # 1.5s between negotiation retries (max 12s total)
+
+  @resume_verification_delay_ms 2000  # 2s delay to ensure HH.ru indexes resume for negotiations
+
   defp user_agent do
     System.get_env("HH_USER_AGENT") || "UllGetTheJob/1.0"
   end
@@ -171,8 +185,14 @@ defmodule Core.HH.Client do
       resume_id = extract_resume_id(customized_cv) ->
         Logger.info("Using provided HH resume id from customized_cv: len=#{String.length(resume_id)}")
         # If caller provided an existing resume id, make sure minimal required fields exist
-        _ = ensure_existing_resume_completeness(access_token, resume_id, customized_cv)
-        {:ok, resume_id}
+        case ensure_existing_resume_completeness(access_token, resume_id, customized_cv) do
+          :ok ->
+            {:ok, resume_id}
+          {:error, reason} ->
+            Logger.error("Failed to ensure resume completeness for resume_id=#{resume_id}: #{inspect(reason)}")
+            # Still proceed with existing resume - completeness update is best-effort
+            {:ok, resume_id}
+        end
 
       true ->
         headers = hh_headers(access_token)
@@ -186,7 +206,12 @@ defmodule Core.HH.Client do
           case find_existing_resume_by_title(access_token, to_string(title || "")) do
             {:ok, existing_id} ->
               Logger.info("Using existing HH resume by title: id=#{existing_id} title=#{inspect(title)}")
-              _ = ensure_existing_resume_completeness(access_token, existing_id, customized_cv)
+              case ensure_existing_resume_completeness(access_token, existing_id, customized_cv) do
+                :ok ->
+                  Logger.debug("Successfully ensured resume completeness for existing resume")
+                {:error, reason} ->
+                  Logger.warning("Failed to update existing resume completeness: #{inspect(reason)}, proceeding anyway")
+              end
               ensure_resume_ready(access_token, existing_id)
               {:ok, existing_id}
 
@@ -341,7 +366,7 @@ defmodule Core.HH.Client do
             {:error, {:http_error, 400, body}} = err ->
               if resume_not_found_reason?(body) do
                 Logger.debug("Negotiation resume_not_found; waiting and retrying...")
-                wait_and_retry_negotiation(auth_headers, job_external_id, resume_id, cover_letter, 8)
+                wait_and_retry_negotiation(auth_headers, job_external_id, resume_id, cover_letter, @negotiation_retry_max_attempts)
               else
                 err
               end
@@ -355,7 +380,7 @@ defmodule Core.HH.Client do
   end
 
   defp wait_and_retry_negotiation(headers, job_external_id, resume_id, cover_letter, attempts) when attempts > 0 do
-    Process.sleep(1500)
+    Process.sleep(@negotiation_retry_delay_ms)
     case do_negotiation_form(headers, job_external_id, resume_id, cover_letter) do
       {:ok, id} -> {:ok, id}
       {:error, {:http_error, 400, body}} ->
@@ -654,7 +679,24 @@ defmodule Core.HH.Client do
   defp normalize_email(nil), do: nil
   defp normalize_email(email) when is_binary(email) do
     email = String.trim(email)
-    if email == "" or not String.contains?(email, "@"), do: nil, else: email
+
+    # Proper email validation with regex (RFC 5322 simplified)
+    # Validates format: local-part@domain with proper character restrictions
+    email_regex = ~r/^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+
+    cond do
+      email == "" ->
+        nil
+      not Regex.match?(email_regex, email) ->
+        Logger.warning("Invalid email format: #{String.slice(email, 0, 20)}...")
+        nil
+      String.length(email) > 254 ->
+        # RFC 5321 maximum email length
+        Logger.warning("Email too long: #{String.length(email)} chars")
+        nil
+      true ->
+        email
+    end
   end
   defp normalize_email(_), do: nil
 
@@ -663,16 +705,40 @@ defmodule Core.HH.Client do
     formatted = String.trim(phone)
     digits = String.replace(formatted, ~r/[^\d]/, "")
 
-    if String.length(digits) < 7 do
-      nil
-    else
-      %{
-        "digits" => digits,
-        "formatted" => formatted
-      }
+    # Proper phone validation per E.164 international standard:
+    # - Must have 10-15 digits (international range)
+    # - Should not be all same digit (invalid pattern like "1111111111")
+    # - Should not be all zeros (placeholder number)
+    digit_length = String.length(digits)
+
+    cond do
+      digit_length < 10 or digit_length > 15 ->
+        Logger.warning("Phone validation failed: invalid length #{digit_length} (expected 10-15)")
+        nil
+
+      all_same_digit?(digits) ->
+        Logger.warning("Phone validation failed: repetitive pattern detected")
+        nil
+
+      String.replace(digits, "0", "") == "" ->
+        Logger.warning("Phone validation failed: all zeros")
+        nil
+
+      true ->
+        %{
+          "digits" => digits,
+          "formatted" => formatted
+        }
     end
   end
   defp normalize_phone(_), do: nil
+
+  # Check if phone number contains only repeated digits (e.g., "1111111111")
+  defp all_same_digit?(digits) when is_binary(digits) and byte_size(digits) > 0 do
+    first = String.first(digits)
+    String.graphemes(digits) |> Enum.all?(&(&1 == first))
+  end
+  defp all_same_digit?(_), do: false
 
   defp build_email_contact(email) do
     %{
@@ -758,24 +824,60 @@ defmodule Core.HH.Client do
   # Removed build_specialization function - do not use
 
   # Required for resume publishing: Professional roles
+  # Maps job titles to HH.ru professional role IDs with priority ordering
   defp build_professional_roles(customized_cv) do
     title = Map.get(customized_cv, "title") || ""
-    
-    # Map to HH.ru professional role IDs
-    role_id = cond do
-      String.contains?(String.downcase(title), ["developer", "engineer", "programmer"]) -> "96"  # Developer/Programmer
-      String.contains?(String.downcase(title), ["analyst"]) -> "10"  # Analyst
-      String.contains?(String.downcase(title), ["data"]) -> "165"  # Data analyst
-      String.contains?(String.downcase(title), ["devops"]) -> "164"  # DevOps
-      String.contains?(String.downcase(title), ["qa", "test"]) -> "124"  # Tester
-      String.contains?(String.downcase(title), ["frontend"]) -> "96"  # Developer
-      String.contains?(String.downcase(title), ["backend"]) -> "96"  # Developer
-      String.contains?(String.downcase(title), ["manager"]) -> "40"  # Project manager
-      String.contains?(String.downcase(title), ["designer"]) -> "34"  # Designer
-      true -> "96"  # Default to Developer
-    end
+    title_lower = String.downcase(title)
 
-    [%{"id" => role_id}]
+    # Priority-ordered role detection (most specific to least specific)
+    # Format: {role_id, keywords, priority}
+    role_patterns = [
+      # High priority - specific technical roles
+      {"164", ["devops", "sre", "site reliability"], 1},
+      {"165", ["data scientist", "ml engineer", "machine learning"], 1},
+      {"124", ["qa engineer", "test engineer", "quality assurance"], 1},
+
+      # Medium priority - specialized development roles
+      {"96", ["frontend", "front-end", "react", "vue", "angular"], 2},
+      {"96", ["backend", "back-end", "server-side"], 2},
+      {"96", ["fullstack", "full-stack", "full stack"], 2},
+      {"96", ["mobile developer", "ios", "android"], 2},
+
+      # Lower priority - general roles
+      {"10", ["business analyst", "system analyst"], 3},
+      {"165", ["data analyst", "data engineer"], 3},
+      {"40", ["project manager", "product manager", "scrum master"], 3},
+      {"34", ["ui designer", "ux designer", "graphic designer"], 3},
+
+      # Lowest priority - broad categories
+      {"96", ["developer", "engineer", "programmer", "software"], 4},
+      {"10", ["analyst"], 4},
+      {"40", ["manager"], 4},
+      {"34", ["designer"], 4}
+    ]
+
+    # Find all matching roles with their priorities
+    matching_roles =
+      role_patterns
+      |> Enum.filter(fn {_id, keywords, _priority} ->
+        Enum.any?(keywords, &String.contains?(title_lower, &1))
+      end)
+      |> Enum.sort_by(fn {_id, _keywords, priority} -> priority end)
+      |> Enum.map(fn {id, _keywords, _priority} -> id end)
+      |> Enum.uniq()
+
+    # Return the best matching role or default to Developer
+    role_ids =
+      case matching_roles do
+        [] ->
+          Logger.info("No professional role match for title '#{title}', defaulting to Developer (96)")
+          ["96"]
+        [first | _rest] ->
+          Logger.info("Matched professional role for title '#{title}': #{first}")
+          [first]
+      end
+
+    Enum.map(role_ids, &%{"id" => &1})
   end
 
   # Employment type preferences - currently disabled (causes API errors)
@@ -822,11 +924,13 @@ defmodule Core.HH.Client do
   end
 
   defp uniquify_title(title) when is_binary(title) do
-    suffix = :erlang.unique_integer([:positive]) |> Integer.to_string()
+    # Use UUID suffix to ensure global uniqueness across distributed systems
+    # erlang.unique_integer is only unique per node and can collide in distributed setups
+    suffix = Ecto.UUID.generate() |> String.slice(0, 8)
     title <> " (" <> suffix <> ")"
   end
 
-  defp ensure_resume_ready(access_token, resume_id, attempts \\ 12)
+  defp ensure_resume_ready(access_token, resume_id, attempts \\ @resume_ready_max_attempts)
        when is_binary(access_token) and is_binary(resume_id) and is_integer(attempts) do
     cond do
       attempts <= 0 -> :ok
@@ -835,7 +939,7 @@ defmodule Core.HH.Client do
           {:ok, _} -> :ok
           _ ->
             Logger.debug("Waiting for resume to become available: id=#{resume_id} attempts_left=#{attempts - 1}")
-            Process.sleep(500)
+            Process.sleep(@resume_ready_delay_ms)
             ensure_resume_ready(access_token, resume_id, attempts - 1)
         end
     end
@@ -851,10 +955,12 @@ defmodule Core.HH.Client do
         can_publish = Map.get(resume, "can_publish_or_update") || Map.get(resume, :can_publish_or_update)
         
         Logger.info("Resume status: id=#{resume_id} status=#{inspect(status)} access=#{inspect(access)} can_publish=#{inspect(can_publish)}")
-        
+
         # Add extra delay to ensure HH.ru has processed the resume for negotiations
-        Logger.info("Adding 2-second delay for HH.ru to process resume for negotiations")
-        Process.sleep(2000)
+        # This is necessary because HH.ru uses eventual consistency and the resume
+        # may not be immediately available in the negotiations endpoint even after creation
+        Logger.info("Adding #{@resume_verification_delay_ms}ms delay for HH.ru to index resume for negotiations")
+        Process.sleep(@resume_verification_delay_ms)
         :ok
         
       {:error, reason} ->
