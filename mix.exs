@@ -46,7 +46,18 @@ defmodule Core.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.0"},
-      {:req, "~> 0.4"}
+      {:req, "~> 0.4"},
+      # Security & Auth
+      {:guardian, "~> 2.3"},
+      {:argon2_elixir, "~> 3.0"},
+      {:cloak_ecto, "~> 1.2"},
+      # Background Jobs
+      {:oban, "~> 2.17"},
+      # Observability
+      {:opentelemetry, "~> 1.4"},
+      {:opentelemetry_exporter, "~> 1.7"},
+      {:opentelemetry_phoenix, "~> 1.2"},
+      {:opentelemetry_ecto, "~> 1.2"}
     ]
   end
 
