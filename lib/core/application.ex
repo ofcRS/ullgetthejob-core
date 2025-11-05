@@ -7,10 +7,23 @@ defmodule Core.Application do
 
   @impl true
   def start(_type, _args) do
+    # Setup OpenTelemetry
+    :opentelemetry_cowboy.setup()
+    OpentelemetryPhoenix.setup(adapter: :bandit)
+    OpentelemetryEcto.setup([:core, :repo])
+
     children = [
+      # Telemetry
       CoreWeb.Telemetry,
+      # Encryption vault (must start before Repo)
+      Core.Vault,
+      # Database
       Core.Repo,
+      # Background job processing
+      {Oban, Application.fetch_env!(:core, Oban)},
+      # DNS clustering
       {DNSCluster, query: Application.get_env(:core, :dns_cluster_query) || :ignore},
+      # PubSub for Phoenix channels
       {Phoenix.PubSub, name: Core.PubSub},
       # Rate limiter for HH.ru API
       Core.RateLimiter,

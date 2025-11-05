@@ -21,6 +21,37 @@ if System.get_env("PHX_SERVER") do
 end
 
 if config_env() == :prod do
+  # Encryption key for sensitive data (OAuth tokens, etc.)
+  encryption_key =
+    System.get_env("ENCRYPTION_KEY") ||
+      raise """
+      environment variable ENCRYPTION_KEY is missing.
+      Generate one with: mix phx.gen.secret 32
+      Then base64 encode it: echo -n "key" | base64
+      """
+
+  config :core, Core.Vault,
+    ciphers: [
+      default: {
+        Cloak.Ciphers.AES.GCM,
+        tag: "AES.GCM.V1",
+        key: Base.decode64!(encryption_key)
+      }
+    ]
+
+  # Guardian secret key for JWT signing
+  guardian_secret =
+    System.get_env("GUARDIAN_SECRET_KEY") ||
+      System.get_env("SECRET_KEY_BASE") ||
+      raise """
+      environment variable GUARDIAN_SECRET_KEY is missing.
+      Generate one with: mix phx.gen.secret
+      """
+
+  config :core, Core.Auth.Guardian,
+    issuer: "core",
+    secret_key: guardian_secret
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
@@ -33,7 +64,7 @@ if config_env() == :prod do
   config :core, Core.Repo,
     # ssl: true,
     url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20"),
     # For machines with several cores, consider starting multiple pools of `pool_size`
     # pool_count: 4,
     socket_options: maybe_ipv6
@@ -66,6 +97,49 @@ if config_env() == :prod do
       port: port
     ],
     secret_key_base: secret_key_base
+
+  # OpenTelemetry exporter endpoint
+  if otlp_endpoint = System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT") do
+    config :opentelemetry_exporter,
+      otlp_endpoint: otlp_endpoint
+  end
+end
+
+# Development environment configuration
+if config_env() == :dev do
+  # Use a default encryption key for development (DO NOT use in production!)
+  config :core, Core.Vault,
+    ciphers: [
+      default: {
+        Cloak.Ciphers.AES.GCM,
+        tag: "AES.GCM.V1",
+        # This is a development-only key. Generate with: :crypto.strong_rand_bytes(32) |> Base.encode64()
+        key: Base.decode64!("qxj4qm2pWCzWJEjSNLFIRe0dKvV+TLvJQPLvGhqJiCA=")
+      }
+    ]
+
+  # Development Guardian secret
+  config :core, Core.Auth.Guardian,
+    issuer: "core",
+    secret_key: "dev_secret_key_change_in_production_use_mix_phx_gen_secret_to_generate"
+end
+
+# Test environment configuration
+if config_env() == :test do
+  # Use a fixed encryption key for tests
+  config :core, Core.Vault,
+    ciphers: [
+      default: {
+        Cloak.Ciphers.AES.GCM,
+        tag: "AES.GCM.V1",
+        key: Base.decode64!("test1234567890123456789012345678")
+      }
+    ]
+
+  # Test Guardian secret
+  config :core, Core.Auth.Guardian,
+    issuer: "core",
+    secret_key: "test_secret_key_for_testing_only"
 
   # ## SSL Support
   #

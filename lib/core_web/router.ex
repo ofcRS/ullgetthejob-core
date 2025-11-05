@@ -5,6 +5,12 @@ defmodule CoreWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Protected API pipeline with JWT authentication
+  pipeline :api_protected do
+    plug :accepts, ["json"]
+    plug CoreWeb.AuthPipeline
+  end
+
   # Internal API for other services
   scope "/api/v1", CoreWeb do
     pipe_through :api
@@ -14,7 +20,7 @@ defmodule CoreWeb.Router do
     post "/jobs/broadcast-dummy", SystemController, :broadcast_dummy
   end
 
-  # API for Node.js BFF
+  # API for Node.js BFF (protected with internal secret)
   scope "/api", CoreWeb.Api do
     pipe_through :api
 
@@ -23,6 +29,7 @@ defmodule CoreWeb.Router do
     post "/applications/submit", ApplicationController, :submit
   end
 
+  # OAuth endpoints (public)
   scope "/auth/hh", CoreWeb do
     pipe_through :api
     get "/redirect", AuthController, :redirect
@@ -30,12 +37,22 @@ defmodule CoreWeb.Router do
     post "/refresh", AuthController, :refresh
   end
 
+  # HH.ru API endpoints (can be protected if needed)
+  # For now, keeping them unprotected as they're used by the orchestrator
   scope "/api/hh", CoreWeb do
     pipe_through :api
     get "/status", HHController, :status
     get "/resumes", HHController, :resumes
     get "/resumes/:id", HHController, :resume_details
   end
+
+  # Example of protected routes (uncomment when needed)
+  # scope "/api/protected", CoreWeb do
+  #   pipe_through :api_protected
+  #
+  #   get "/user/profile", UserController, :profile
+  #   put "/user/settings", UserController, :update_settings
+  # end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:core, :dev_routes) do

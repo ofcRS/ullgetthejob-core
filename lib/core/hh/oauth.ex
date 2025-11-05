@@ -70,30 +70,37 @@ defmodule Core.HH.OAuth do
   end
 
   defp refresh_token(%Token{refresh_token: refresh_token} = token) when is_binary(refresh_token) do
-    with {:ok, attrs} <- request_refresh(refresh_token),
-         normalized <- normalize_attrs(token.user_id, attrs),
-         normalized <- Map.update(normalized, :refresh_token, refresh_token, fn
-           nil -> refresh_token
-           value -> value
-         end),
-         {:ok, updated} <-
-           token
-           |> Token.changeset(normalized)
-           |> Repo.update()
-    do
-      {:ok, updated.access_token}
-    else
-      {:error, :no_refresh_token} = error ->
-        Logger.error("Failed to refresh HH token: #{inspect(error)}")
-        error
+    # Use explicit transaction to ensure atomicity of token refresh
+    Repo.transaction(fn ->
+      with {:ok, attrs} <- request_refresh(refresh_token),
+           normalized <- normalize_attrs(token.user_id, attrs),
+           normalized <- Map.update(normalized, :refresh_token, refresh_token, fn
+             nil -> refresh_token
+             value -> value
+           end),
+           {:ok, updated} <-
+             token
+             |> Token.changeset(normalized)
+             |> Repo.update()
+      do
+        updated.access_token
+      else
+        {:error, :no_refresh_token} = error ->
+          Logger.error("Failed to refresh HH token: #{inspect(error)}")
+          Repo.rollback(error)
 
-      {:error, {:http_error, _status, _body} = error} ->
-        Logger.error("Failed to refresh HH token: #{inspect(error)}")
-        error
+        {:error, {:http_error, _status, _body} = error} ->
+          Logger.error("Failed to refresh HH token: #{inspect(error)}")
+          Repo.rollback(error)
 
-      {:error, changeset} ->
-        Logger.error("Failed to persist refreshed HH token: #{inspect(changeset)}")
-        {:error, changeset}
+        {:error, changeset} ->
+          Logger.error("Failed to persist refreshed HH token: #{inspect(changeset)}")
+          Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, access_token} -> {:ok, access_token}
+      {:error, reason} -> {:error, reason}
     end
   end
 
