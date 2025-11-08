@@ -1,12 +1,15 @@
 defmodule Core.Broadcaster do
   @moduledoc """
-  Broadcasts job updates to the API service via HTTP POST
+  Broadcasts job updates to the API service via HTTP POST and
+  real-time updates via WebSocket/PubSub
   """
 
   require Logger
+  alias Phoenix.PubSub
 
   @api_base_url System.get_env("API_BASE_URL", "http://localhost:3000")
   @api_secret System.get_env("ORCHESTRATOR_SECRET", "shared_secret_between_core_and_api")
+  @pubsub Core.PubSub
 
   def broadcast_jobs(jobs, stats \\ %{}) do
     url = "#{@api_base_url}/api/v1/jobs/broadcast"
@@ -86,5 +89,61 @@ defmodule Core.Broadcaster do
     ]
 
     broadcast_jobs(dummy_jobs, %{source: "dummy"})
+  end
+
+  @doc """
+  Broadcast customization progress via PubSub
+  """
+  def broadcast_customization_progress(user_id, data) do
+    message = %{
+      type: "customization_progress",
+      data: data,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    PubSub.broadcast(@pubsub, "user:#{user_id}", {:websocket_message, message})
+    Logger.debug("Broadcasted customization progress to user #{user_id}")
+  end
+
+  @doc """
+  Broadcast application progress during auto-apply
+  """
+  def broadcast_application_progress(user_id, data) do
+    message = %{
+      type: "application_progress",
+      data: data,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    PubSub.broadcast(@pubsub, "user:#{user_id}", {:websocket_message, message})
+    Logger.debug("Broadcasted application progress to user #{user_id}")
+  end
+
+  @doc """
+  Broadcast rate limit update
+  """
+  def broadcast_rate_limit_update(user_id, data) do
+    message = %{
+      type: "rate_limit_update",
+      data: data,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    PubSub.broadcast(@pubsub, "user:#{user_id}", {:websocket_message, message})
+    Logger.debug("Broadcasted rate limit update to user #{user_id}")
+  end
+
+  @doc """
+  Broadcast application completion
+  """
+  def broadcast_application_completed(user_id, data) do
+    message = %{
+      type: "application_completed",
+      data: data,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    PubSub.broadcast(@pubsub, "user:#{user_id}", {:websocket_message, message})
+    Logger.info("Broadcasted application completion to user #{user_id}: #{inspect(data.job_title)}")
   end
 end
