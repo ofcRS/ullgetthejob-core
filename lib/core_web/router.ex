@@ -27,6 +27,14 @@ defmodule CoreWeb.Router do
     post "/jobs/search", JobController, :search
     get "/jobs/:id", JobController, :show
     post "/applications/submit", ApplicationController, :submit
+
+    # Queue management
+    post "/queue/batch-customize", QueueController, :batch_customize
+    post "/queue/start-workflow", QueueController, :start_workflow
+    get "/queue/progress/:workflow_id", QueueController, :progress
+
+    # Rate limit status
+    get "/rate-limit/status/:user_id", RateLimitController, :status
   end
 
   # OAuth endpoints (public)
