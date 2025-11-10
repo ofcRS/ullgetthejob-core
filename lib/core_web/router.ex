@@ -29,6 +29,8 @@ defmodule CoreWeb.Router do
     post "/applications/submit", ApplicationController, :submit
 
     # Queue management
+    post "/queue/add", QueueController, :add
+    get "/queue/status/:user_id", QueueController, :status
     post "/queue/batch-customize", QueueController, :batch_customize
     post "/queue/start-workflow", QueueController, :start_workflow
     get "/queue/progress/:workflow_id", QueueController, :progress
