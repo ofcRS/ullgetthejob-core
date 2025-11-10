@@ -40,6 +40,7 @@ config :core, Oban,
     {Oban.Plugins.Cron, crontab: []}  # Placeholder for future cron jobs
   ],
   queues: [
+    orchestration: 1,   # Smart scheduling orchestrator (SmartOrchestrator) - single worker
     customization: 5,   # Batch CV customization (BatchCustomizeWorker)
     applications: 3,    # Auto-apply submissions (AutoApplyWorker) - slower to respect rate limits
     default: 5          # Default queue for other jobs

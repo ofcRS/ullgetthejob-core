@@ -158,6 +158,60 @@ defmodule CoreWeb.Api.QueueController do
     })
   end
 
+  @doc """
+  Trigger smart orchestration for workflow
+  POST /api/queue/optimize
+  Body: {workflow_id, user_id}
+  """
+  def optimize(conn, %{"workflow_id" => workflow_id, "user_id" => user_id}) do
+    Logger.info("Triggering smart orchestration: workflow=#{workflow_id} user=#{user_id}")
+
+    # Queue smart orchestrator job
+    case %{
+      "workflow_id" => workflow_id,
+      "user_id" => user_id
+    }
+    |> Core.Workers.SmartOrchestrator.new()
+    |> Oban.insert() do
+      {:ok, %Oban.Job{id: job_id}} ->
+        # Get estimated completion
+        items = Workflow.get_workflow_items(workflow_id)
+        estimate = Core.Scheduling.Optimizer.estimate_completion(items, user_id)
+
+        json(conn, %{
+          success: true,
+          job_id: job_id,
+          message: "Smart orchestration started",
+          estimate: estimate
+        })
+
+      {:error, reason} ->
+        Logger.error("Failed to start orchestration: #{inspect(reason)}")
+
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{
+          success: false,
+          error: "Failed to start smart orchestration"
+        })
+    end
+  end
+
+  @doc """
+  Get workflow statistics with scheduling info
+  GET /api/queue/stats/:workflow_id
+  """
+  def stats(conn, %{"workflow_id" => workflow_id}) do
+    Logger.info("Getting workflow stats: workflow=#{workflow_id}")
+
+    stats = Workflow.get_workflow_stats(workflow_id)
+
+    json(conn, %{
+      success: true,
+      stats: stats
+    })
+  end
+
   defp verify_orchestrator_secret(conn, _opts) do
     secret = conn |> get_req_header("x-core-secret") |> List.first()
     expected = System.get_env("ORCHESTRATOR_SECRET")

@@ -138,4 +138,76 @@ defmodule Core.Workflow do
       current_tokens: rate_status.tokens
     }
   end
+
+  @doc """
+  Get high-priority items for a workflow (sorted by priority score DESC)
+  """
+  def get_high_priority_items(workflow_id, limit \\ 10) do
+    ApplicationQueue
+    |> where([q], q.workflow_id == ^workflow_id)
+    |> where([q], q.status in ["pending", "ready"])
+    |> order_by([q], [desc: q.priority, asc: q.next_run_at])
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  @doc """
+  Update priority for an item
+  """
+  def update_priority(item_id, priority) do
+    ApplicationQueue
+    |> Repo.get!(item_id)
+    |> Ecto.Changeset.change(%{
+      priority: priority,
+      updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Bulk update schedule for items (used by orchestrator)
+  """
+  def bulk_update_schedule(updates) when is_list(updates) do
+    Enum.map(updates, fn %{id: id, next_run_at: next_run_at, priority: priority} ->
+      ApplicationQueue
+      |> Repo.get!(id)
+      |> Ecto.Changeset.change(%{
+        next_run_at: next_run_at,
+        priority: priority,
+        updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+      })
+      |> Repo.update()
+    end)
+  end
+
+  @doc """
+  Get workflow statistics including scheduling info
+  """
+  def get_workflow_stats(workflow_id) do
+    items = get_workflow_items(workflow_id)
+    progress = get_progress(workflow_id)
+
+    # Calculate average priority
+    avg_priority =
+      items
+      |> Enum.map(& &1.priority)
+      |> Enum.sum()
+      |> case do
+        0 -> 0
+        sum -> div(sum, length(items))
+      end
+
+    # Find next scheduled time
+    next_scheduled =
+      items
+      |> Enum.filter(&(&1.status in ["pending", "ready"]))
+      |> Enum.map(& &1.next_run_at)
+      |> Enum.min(fn -> DateTime.utc_now() end, DateTime)
+
+    Map.merge(progress, %{
+      total_items: length(items),
+      avg_priority: avg_priority,
+      next_scheduled: next_scheduled
+    })
+  end
 end

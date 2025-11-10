@@ -34,6 +34,8 @@ defmodule CoreWeb.Router do
     post "/queue/batch-customize", QueueController, :batch_customize
     post "/queue/start-workflow", QueueController, :start_workflow
     get "/queue/progress/:workflow_id", QueueController, :progress
+    post "/queue/optimize", QueueController, :optimize
+    get "/queue/stats/:workflow_id", QueueController, :stats
 
     # Rate limit status
     get "/rate-limit/status/:user_id", RateLimitController, :status
