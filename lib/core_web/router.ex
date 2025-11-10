@@ -37,6 +37,32 @@ defmodule CoreWeb.Router do
     get "/rate-limit/status/:user_id", RateLimitController, :status
   end
 
+  # AI-powered features API
+  scope "/api/ai", CoreWeb.API do
+    pipe_through :api
+
+    # Main orchestration
+    post "/orchestrate", AIController, :orchestrate
+    post "/evaluate-job", AIController, :evaluate_job
+
+    # Job matching
+    post "/match", AIController, :compute_match
+
+    # Success prediction
+    post "/predict", AIController, :predict_success
+    post "/record-outcome", AIController, :record_outcome
+
+    # Company research
+    post "/research-company", AIController, :research_company
+
+    # Analytics
+    get "/analytics/realtime", AIController, :realtime_metrics
+    get "/analytics/user/:user_id", AIController, :user_analytics
+
+    # Health check
+    get "/health", AIController, :health
+  end
+
   # OAuth endpoints (public)
   scope "/auth/hh", CoreWeb do
     pipe_through :api
