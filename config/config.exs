@@ -40,8 +40,9 @@ config :core, Oban,
     {Oban.Plugins.Cron, crontab: []}  # Placeholder for future cron jobs
   ],
   queues: [
-    hh_api: 5,  # HH.ru API operations, max 5 concurrent
-    default: 10  # Default queue for other jobs
+    customization: 5,   # Batch CV customization (BatchCustomizeWorker)
+    applications: 3,    # Auto-apply submissions (AutoApplyWorker) - slower to respect rate limits
+    default: 5          # Default queue for other jobs
   ]
 
 # Configures the endpoint
