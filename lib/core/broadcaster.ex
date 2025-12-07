@@ -146,4 +146,25 @@ defmodule Core.Broadcaster do
     PubSub.broadcast(@pubsub, "user:#{user_id}", {:websocket_message, message})
     Logger.info("Broadcasted application completion to user #{user_id}: #{inspect(data.job_title)}")
   end
+
+  @doc """
+  Generic broadcast update to a specific topic
+  """
+  def broadcast_update(topic, data) do
+    message = %{
+      type: "update",
+      data: data,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    PubSub.broadcast(@pubsub, topic, {:websocket_message, message})
+    Logger.debug("Broadcasted update to topic #{topic}")
+  end
+
+  @doc """
+  Notify a specific topic with data (alias for broadcast_update)
+  """
+  def notify(topic, data) do
+    broadcast_update(topic, data)
+  end
 end

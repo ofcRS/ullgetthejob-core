@@ -21,9 +21,9 @@ defmodule Core.RateLimiter do
 
   defmodule Bucket do
     @moduledoc false
-    defstruct tokens: @capacity,
-              capacity: @capacity,
-              refill_rate: @refill_rate,
+    defstruct tokens: 20,
+              capacity: 20,
+              refill_rate: 8,
               last_refill: nil
   end
 
@@ -55,6 +55,15 @@ defmodule Core.RateLimiter do
     GenServer.cast(__MODULE__, {:reset, user_id, action_type})
   end
 
+  @doc """
+  Check available tokens for a user.
+  Returns {:ok, tokens} with current token count.
+  """
+  def check_tokens(user_id, action_type \\ :application) do
+    status = get_status(user_id, action_type)
+    {:ok, status.tokens}
+  end
+
   # Server Callbacks
 
   @impl true
@@ -81,7 +90,7 @@ defmodule Core.RateLimiter do
       _ ->
         # Calculate when tokens will be available
         next_refill = calculate_next_refill(bucket)
-        Logger.warn("Rate limit exceeded for user #{user_id}, action: #{action_type}")
+        Logger.warning("Rate limit exceeded for user #{user_id}, action: #{action_type}")
         {:reply, {:error, :rate_limited, next_refill}, state}
     end
   end

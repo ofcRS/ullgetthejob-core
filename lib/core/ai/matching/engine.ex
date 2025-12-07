@@ -20,6 +20,7 @@ defmodule Core.AI.Matching.Engine do
   """
 
   require Logger
+  import Ecto.Query
   alias Core.Repo
   alias Core.Schema.AiJobMatchingScore
   alias Core.AI.Matching.{Scorer, FeatureExtractor}

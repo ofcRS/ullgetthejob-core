@@ -36,7 +36,7 @@ defmodule Core.Auth.Guardian do
   Generate a JWT token for a user_id.
   """
   def generate_token(user_id) when is_binary(user_id) do
-    create_token(%{id: user_id}, %{})
+    encode_and_sign(%{id: user_id}, %{})
   end
 
   @doc """

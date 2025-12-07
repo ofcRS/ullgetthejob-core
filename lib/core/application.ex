@@ -7,10 +7,17 @@ defmodule Core.Application do
 
   @impl true
   def start(_type, _args) do
-    # Setup OpenTelemetry
-    :opentelemetry_cowboy.setup()
-    OpentelemetryPhoenix.setup(adapter: :bandit)
-    OpentelemetryEcto.setup([:core, :repo])
+    # Setup OpenTelemetry (optional - skip if modules not available or incompatible)
+    try do
+      if Code.ensure_loaded?(:opentelemetry_cowboy) do
+        :opentelemetry_cowboy.setup()
+      end
+      # Note: OpentelemetryPhoenix doesn't support bandit adapter, use nil
+      OpentelemetryPhoenix.setup()
+      OpentelemetryEcto.setup([:core, :repo])
+    rescue
+      _ -> :ok
+    end
 
     children = [
       # Telemetry

@@ -219,7 +219,7 @@ defmodule Core.AI.Analytics do
     cutoff = DateTime.utc_now() |> DateTime.add(-days_back * 24 * 3600, :second)
 
     query = from e in AiAnalyticsEvent,
-      where: e.model_version is not nil,
+      where: not is_nil(e.model_version),
       where: e.event_timestamp >= ^cutoff,
       where: fragment("? LIKE ?", e.event_name, ^"%#{model_type}%"),
       select: %{
