@@ -24,14 +24,17 @@ defmodule CoreWeb.AuthController do
 
     with {:ok, code} <- fetch_code(params),
          {:ok, tokens} <- exchange_code_for_tokens(code),
-         {:ok, _record} <- Core.HH.OAuth.upsert_token(session_id, tokens) do
-      json(conn, %{success: true, tokens: tokens, session_id: session_id})
+         {:ok, _record} <- Core.HH.OAuth.upsert_token(session_id, tokens),
+         {:ok, jwt, _claims} <- Core.Auth.Guardian.generate_token(session_id) do
+      Logger.info("OAuth callback successful - generated JWT for session #{session_id}")
+      json(conn, %{success: true, jwt: jwt, session_id: session_id})
     else
       {:error, changeset = %Ecto.Changeset{}} ->
         Logger.error("Failed to store HH tokens: #{inspect(changeset)}")
         conn |> put_status(500) |> json(%{success: false, error: "Failed to persist tokens"})
 
       {:error, reason} ->
+        Logger.error("OAuth callback failed: #{inspect(reason)}")
         conn |> put_status(400) |> json(%{success: false, error: inspect(reason)})
     end
   end
